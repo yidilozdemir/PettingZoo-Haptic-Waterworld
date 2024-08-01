@@ -1,6 +1,6 @@
 ## Haptic- Waterworld
 
-This is an extension of Pettingzoo's Waterworld environment, where agents are embodied with arousal and satiety, and can modulate these parameters via eating and social contact through haptic touch/proximity. The idea is to investigate the effects of arousal modulation via social contact in a cooperative resource sharing behaviour. 
+This is an extension of Pettingzoo's Waterworld environment, where agents are embodied with arousal and satiety, and can modulate these parameters via eating and social contact through haptic touch/proximity. The idea is to investigate the effects of arousal modulation via social contact in a cooperative resource sharing paradigm.
 
 
 The original Waterworld environment: https://pettingzoo.farama.org/environments/sisl/waterworld/
