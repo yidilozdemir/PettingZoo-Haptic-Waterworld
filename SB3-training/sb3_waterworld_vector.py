@@ -16,7 +16,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.ppo import MlpPolicy
 from scipy import stats
 
-from pettingzoo.sisl import waterworld_v4
+from pettingzoo.sisl import waterworld_v4, waterworld_model1
 
 import matplotlib.pyplot as plt
 from stable_baselines3.common.callbacks import BaseCallback
@@ -313,20 +313,35 @@ def eval(env_fn, num_games: int = 100, render_mode: str | None = None, **env_kwa
     print(f"Avg reward: {avg_reward}")
     return avg_reward
 
+def find_latest_policy(env_name, base_dir="."):
+    log_dir = os.path.join(base_dir, "logs")
+    
+    # Find all directories matching the pattern
+    pattern = os.path.join(log_dir, f"{env_name}*")
+    matching_dirs = glob.glob(pattern)
+    
+    if not matching_dirs:
+        print(f"No matching directories found in {log_dir}")
+        return None
+    
+    # Find the most recent directory
+    latest_dir = max(matching_dirs, key=os.path.getctime)
+    
+    # Look for best_model.zip in the latest directory
+    best_model_path = os.path.join(latest_dir, "best_model.zip")
+    
+    if os.path.exists(best_model_path):
+        return best_model_path
+    else:
+        print(f"best_model.zip not found in {latest_dir}")
+        return None
+    
 def eval_new(seed_start, env_fn, num_games: int = 100, render_mode: str | None = None, deterministic: bool = True, save_path: str = "./eval_results", **env_kwargs):
     env = env_fn.env(render_mode=render_mode, **env_kwargs)
-
-    try:
-        # Look for the best model in the logs directory
-        latest_policy = max(
-            glob.glob(f"{env.metadata['name']}*.zip"), key=os.path.getctime
-        )
-
-        print(f"Loading policy from: {latest_policy}")
-    except ValueError:
-        print("Policy not found.")
-        exit(0)
-
+                                        
+    env_name = env.metadata['name'] # Adjust this to match your folder naming convention
+    latest_policy = find_latest_policy(env_name)
+    print(latest_policy)
     model = PPO.load(latest_policy)
 
     
@@ -463,7 +478,7 @@ def call_eval(n_evaluations = 5):
 
 
 if __name__ == "__main__":
-    env_fn = waterworld_v4
+    env_fn = waterworld_model1
     env_kwargs = {}
 
     # Train a model (takes ~3 minutes on GPU)
@@ -473,10 +488,10 @@ if __name__ == "__main__":
     #log_dir = train_butterfly_supersuit(env_fn, steps=196_608, seed=0, **env_kwargs)
     
     # Plot the results
-    #from stable_baselines3.common import results_plotter
-    #results_plotter.plot_results(
-    #    [log_dir], 196_608, results_plotter.X_TIMESTEPS, "PPO Waterworld"
-    #)
+    from stable_baselines3.common import results_plotter
+    results_plotter.plot_results(
+        ['./logs/waterworld_model1_20240801-204746'], 196_608, results_plotter.X_TIMESTEPS, "PPO Waterworld"
+    )
 
     # Watch 2 games
     #eval(env_fn, num_games=10, render_mode=None, **env_kwargs)
