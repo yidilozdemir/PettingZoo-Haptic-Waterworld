@@ -1,82 +1,40 @@
-[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://pre-commit.com/) [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+## Haptic- Waterworld
 
-<p align="center">
-    <img src="https://raw.githubusercontent.com/Farama-Foundation/PettingZoo/master/pettingzoo-text.png" width="500px"/>
-</p>
+This is an extension of Pettingzoo's Waterworld environment, where agents are embodied with arousal and satiety, and can modulate these parameters via eating and social contact through haptic touch/proximity. The idea is to investigate the effects of arousal modulation via social contact in a cooperative resource sharing behaviour. 
 
-PettingZoo is a Python library for conducting research in multi-agent reinforcement learning, akin to a multi-agent version of [Gymnasium](https://github.com/Farama-Foundation/Gymnasium).
+The original Waterworld environment: https://pettingzoo.farama.org/environments/sisl/waterworld/
 
-The documentation website is at [pettingzoo.farama.org](https://pettingzoo.farama.org) and we have a public discord server (which we also use to coordinate development work) that you can join here: https://discord.gg/nhvKkYa6qX
+The Waterworld environment contains "pursuers", agents, whose primary goal is to eat food sources "evaders", and cooperation is implicitly expected as agents can only eat food if they are in physical proximity to each other. Pursuers have sensors to detect the moving objects near them and identify if they are other pursuers/ evader-food or poison; observational space of each agent. Waterworld has a contunious action space; where agents are controlled with a two dimensional velocity vector, by a policy that trains on the state of the environment and rewards recieved after each movement command is applied. I have built on this environment with the following concepts applied to the agents, and a new reward structure to encourage agents to modulate these concepts:
 
-## Environments
+Descriptions	
+    Satiety: Agents have a satiety parameter, that is initialised with a satiety value of 0.5. This gets modulated in environment with eating; there is a decay rate so decreases in natural conditions. No clipping     but a max_satiety value makes sure agents cannot eat more 
+	Arousal: Agents have an arousal parameter, that is initialised at 0. This gets modulated in environment with eating as well as social contact; where agents stand physically next to each other. There is a          decay rate so decreases in natural conditions. Gets clipped to [-1,1]
+	Eating: If more than 2 agents, whose satiety values are below max_satiety, are near the food, eating happens. Increases satiety and slightly increases arousal.
+	Social contact: When agents are together, in average mode, their arousal levels get pulled to the "group" average
 
-PettingZoo includes the following families of environments:
+Adjusted reward structure
+    Control reward: Inherited from Waterworld, this penalises large thursts, to encourage smoother/no big changes
+    Behaviour reward: Inherited from Waterworld, food eating reward (biggest) + small poison encounter penalty + "shaping reward": small reward from agents touching each other when there is no eating
+    Satiety reward: Small reward for satiety values; Since satiety is capped in the system (max_satiety) there is no penalty for too high 
+    Arousal penalty: To discourage too high or too low arousal levels
 
-* [Atari](https://pettingzoo.farama.org/environments/atari/): Multi-player Atari 2600 games (cooperative, competitive and mixed sum)
-* [Butterfly](https://pettingzoo.farama.org/environments/butterfly): Cooperative graphical games developed by us, requiring a high degree of coordination
-* [Classic](https://pettingzoo.farama.org/environments/classic): Classical games including card games, board games, etc.
-* [MPE](https://pettingzoo.farama.org/environments/mpe): A set of simple nongraphical communication tasks, originally from https://github.com/openai/multiagent-particle-envs
-* [SISL](https://pettingzoo.farama.org/environments/sisl): 3 cooperative environments, originally from https://github.com/sisl/MADRL
+## Chosen Multi-agent Reinforcement Learning (MARL) Algorithm 
 
-## Installation
+I chose to use the Proximal Policy Optimisation (PPO) learning to train a Multi-layer Peceptron(Mlp) to control the agents in a "centralised learning, decentralised execution" approach. Mlp is recommended to use in a continuious action space, as suggested by the SB3 library training tutorial designed for Waterworld https://pettingzoo.farama.org/tutorials/sb3/waterworld/
 
-To install the base PettingZoo library: `pip install pettingzoo`.
+In training, a central PPO policy is trained, and during execution, each agent interacts with the policy with their own observation and action space; this type of parameter sharing policy approach, based on conversations with colleagues and online material, is a good enough approach with PPO to train multi agents. This is evidenced with the fact that many centralised learning, decentralised execution learning approaches like MADDPG are popular in MARL.
+" Also look into MAPPO which utilises shared observations in the value function for improved cooperation. I generally use one of these for everything. They are not necessarily state-of-the-art but in my personal opinion they are nearly always the best way to go."
+https://github.com/DLR-RM/stable-baselines3/issues/1817
 
-This does not include dependencies for all families of environments (some environments can be problematic to install on certain systems).
+I am using SB3 library, and my training is modified from the SB3 tutorial from PettingZoo for Waterworld. In the training, I incorporated an EvalCallback to periodically evaluate the trained model to pick the best one, and a general Callback function to plot rewards and social contact over time. 
 
-To install the dependencies for one family, use `pip install 'pettingzoo[atari]'`, or use `pip install 'pettingzoo[all]'` to install all dependencies.
+## Getting startedL: Python environment 
 
-We support Python 3.8, 3.9, 3.10 and 3.11 on Linux and macOS. We will accept PRs related to Windows, but do not officially support it.
+I am using a conda environment with Python 3.11, pettingzoo and sb3 installed via pip with their dependencies. 
 
-Note: Some Linux distributions may require manual installation of `cmake`, `swig`, or `zlib1g-dev` (e.g., `sudo apt install cmake swig zlib1g-dev`)
+## Use
 
-## Getting started
-
-For an introduction to PettingZoo, see [Basic Usage](https://pettingzoo.farama.org/content/basic_usage/). To create a new environment, see our [Environment Creation Tutorial](https://pettingzoo.farama.org/tutorials/custom_environment/1-project-structure/) and [Custom Environment Examples](https://pettingzoo.farama.org/content/environment_creation/).
-For examples of training RL models using PettingZoo see our tutorials:
-* [CleanRL: Implementing PPO](https://pettingzoo.farama.org/tutorials/cleanrl/implementing_PPO/): train multiple PPO agents in the [Pistonball](https://pettingzoo.farama.org/environments/butterfly/pistonball/) environment.
-* [Tianshou: Training Agents](https://pettingzoo.farama.org/tutorials/tianshou/intermediate/): train DQN agents in the [Tic-Tac-Toe](https://pettingzoo.farama.org/environments/classic/tictactoe/) environment.
-* [AgileRL: Training, Curriculums and Self-play](https://pettingzoo.farama.org/main/tutorials/agilerl/DQN/): train agents with curriculum learning and self-play in the [Connect Four](https://pettingzoo.farama.org/environments/classic/connect_four/) environment.
-
-## API
-
-PettingZoo model environments as [*Agent Environment Cycle* (AEC) games](https://arxiv.org/pdf/2009.14471.pdf), in order to be able to cleanly support all types of multi-agent RL environments under one API and to minimize the potential for certain classes of common bugs.
-
-Using environments in PettingZoo is very similar to Gymnasium, i.e. you initialize an environment via:
-
-```python
-from pettingzoo.butterfly import pistonball_v6
-env = pistonball_v6.env()
-```
-
-Environments can be interacted with in a manner very similar to Gymnasium:
-
-```python
-env.reset()
-for agent in env.agent_iter():
-    observation, reward, termination, truncation, info = env.last()
-    action = None if termination or truncation else env.action_space(agent).sample()  # this is where you would insert your policy
-    env.step(action)
-```
-
-For the complete API documentation, please see https://pettingzoo.farama.org/api/aec/
-
-### Parallel API
-
-In certain environments, it's a valid to assume that agents take their actions at the same time. For these games, we offer a secondary API to allow for parallel actions, documented at https://pettingzoo.farama.org/api/parallel/
-
-## SuperSuit
-
-SuperSuit is a library that includes all commonly used wrappers in RL (frame stacking, observation, normalization, etc.) for PettingZoo and Gymnasium environments with a nice API. We developed it in lieu of wrappers built into PettingZoo. https://github.com/Farama-Foundation/SuperSuit
-
-## Environment Versioning
-
-PettingZoo keeps strict versioning for reproducibility reasons. All environments end in a suffix like "\_v0".  When changes are made to environments that might impact learning results, the number is increased by one to prevent potential confusion.
-
-## Project Maintainers
-Project Manager: [Elliot Tower](https://github.com/elliottower/)
-
-Maintenance for this project is also contributed by the broader Farama team: [farama.org/team](https://farama.org/team).
+Currently, both training and evaluation code is in the same script in folder `sb3-training`
 
 ## Citation
 
