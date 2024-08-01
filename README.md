@@ -24,6 +24,45 @@ The Waterworld environment contains "pursuers", agents, whose primary goal is to
 - Satiety reward: Small reward for satiety values; Since satiety is capped in the system (max_satiety) there is no penalty for too high 
 - Arousal penalty: To discourage too high or too low arousal levels
 
+#### Relationship between concepts and emerging behaviour
+
+Satiety and arousal:
+
+When satiety increases (during eating), it causes a short-term increase in arousal.
+When satiety is low (high hunger), it causes a gradual increase in arousal over time. 
+When arousal is high, it causes a faster decay rate in satiety resulting in lower satiety.
+
+This creates an interesting dynamic:
+Eating (increasing satiety) gives a quick boost to arousal.
+Being hungry (low satiety) slowly increases arousal over time.
+This system models both the immediate stimulation from eating and the growing agitation from prolonged hunger. The balance between these effects, along with the social modulation and other factors, contributes to the complex behavior of the agents in your simulation.
+
+Eating and satiety:
+
+Eating increases satiety if the agent's satiety is below the maximum value
+
+Eating and arousal:
+
+Eating is a social activity in this simulation. It requires multiple pursuers to be in close proximity to the food source, thus the arousal gets affected in two main ways; a) The act of eating (increasing satiety) b) The social contact with other pursuers (through haptic modulation)
+
+This creates a more complex dynamic where:
+Hungry pursuers need to not only find food but also coordinate with other pursuers to actually consume it.
+The act of eating inherently involves social interaction, which affects arousal through both food consumption and social modulation.
+The arousal changes from eating and social contact happen simultaneously, potentially amplifying or dampening each other's effects.
+
+Social contact and arousal-satiety: 
+
+
+Causal chains become harder to trace due to the complex nature, and we aim to investigate and reason with this in our simulation: 
+Social contact pulls the arousal of the agents in contact to the average of the group (average mode) In this scenario, after a contact, based on whether agent's arousal rate got higher or lower, different behaviours can emerge: 
+1. Agent's arousal rate increases after contact -> lower satiety -> less rewards/agents might be encouraged seek more rewards while arousal increases, is penalised -> to decrease/modulate arousal social contact can happen or food might be preferred at the expense of arousal penalty, entering a fast satiety decay/food eating cyclic behaviour
+2. Agent's arousal rate decreases after contact -> higher satiety -> more rewards recieved -> which can encourage more haptic contact 
+
+Social eating mechanic adds another layer of complexity to the system, potentially leading to interesting emergent behaviors like:
+
+Pursuers clustering around food sources
+Coordination or competition between pursuers for eating opportunities
+Complex arousal dynamics due to the combination of eating and social effects
 
 #### The code for this environment
 
