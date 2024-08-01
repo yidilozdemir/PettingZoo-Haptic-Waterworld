@@ -198,7 +198,7 @@ class Pursuers(MovingObject):
         self.arousal = np.clip(self.arousal, -1, 1)
 
          # Update satiety and radius
-        satiety_decrease_rate = 0.05 * (1 + self.arousal)
+        satiety_decrease_rate = self.satiety_decay_rate * (1 + self.arousal)
         self.satiety = max(self.satiety - satiety_decrease_rate * dt, 0)
         
         # Decay and clip arousal
