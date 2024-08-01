@@ -10,17 +10,19 @@ The Waterworld environment contains "pursuers", agents, whose primary goal is to
 
 
 ### Descriptions	
-    1) Satiety: Agents have a satiety parameter, that is initialised with a satiety value of 0.5. This gets modulated in environment with eating; there is a decay rate so decreases in natural conditions. No clipping     but a max_satiety value makes sure agents cannot eat more 
+
+1) Satiety: Agents have a satiety parameter, that is initialised with a satiety value of 0.5. This gets modulated in environment with eating; there is a decay rate so decreases in natural conditions. No clipping     but a max_satiety value makes sure agents cannot eat more 
 2) Arousal: Agents have an arousal parameter, that is initialised at 0. This gets modulated in environment with eating as well as social contact; where agents stand physically next to each other. There is a          decay rate so decreases in natural conditions. Gets clipped to [-1,1]
 3) Eating: If more than 2 agents, whose satiety values are below max_satiety, are near the food, eating happens. Increases satiety and slightly increases arousal.
 4) Social contact: When agents are together, in average mode, their arousal levels get pulled to the "group" average
 
 
 #### Adjusted reward structure
-    - Control reward: Inherited from Waterworld, this penalises large thursts, to encourage smoother/no big changes
+
+- Control reward: Inherited from Waterworld, this penalises large thursts, to encourage smoother/no big changes
 - Behaviour reward: Inherited from Waterworld, food eating reward (biggest) + small poison encounter penalty + "shaping reward": small reward from agents touching each other when there is no eating
-  - Satiety reward: Small reward for satiety values; Since satiety is capped in the system (max_satiety) there is no penalty for too high 
-   - Arousal penalty: To discourage too high or too low arousal levels
+- Satiety reward: Small reward for satiety values; Since satiety is capped in the system (max_satiety) there is no penalty for too high 
+- Arousal penalty: To discourage too high or too low arousal levels
 
 
 ## Chosen Multi-agent Reinforcement Learning (MARL) Algorithm 
