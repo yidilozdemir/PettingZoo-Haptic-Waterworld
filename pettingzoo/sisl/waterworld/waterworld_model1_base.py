@@ -7,8 +7,9 @@ import pymunk
 from gymnasium import spaces
 from gymnasium.utils import seeding
 from scipy.spatial import distance as ssd
+import random
 
-from pettingzoo.sisl.waterworld.waterworld_models import (
+from pettingzoo.sisl.waterworld.waterworld_model1_models import (
     Evaders,
     Obstacle,
     Poisons,
@@ -113,6 +114,7 @@ class WaterworldBase:
         self.last_dones = [False for _ in range(self.n_pursuers)]
         self.last_obs = [None for _ in range(self.n_pursuers)]
         self.last_rewards = [np.float64(0) for _ in range(self.n_pursuers)]
+        self.rewards = [np.float64(0) for _ in range(self.n_pursuers)]
 
         if obstacle_coord is not None and len(obstacle_coord) != self.n_obstacles:
             raise ValueError("obstacle_coord does not have same length as n_obstacles")
@@ -418,16 +420,14 @@ class WaterworldBase:
         self.last_rewards = [np.float64(0) for _ in range(self.n_pursuers)]
         self.control_rewards = [0 for _ in range(self.n_pursuers)]
         self.behavior_rewards = [0 for _ in range(self.n_pursuers)]
+        self.rewards = [np.float64(0) for _ in range(self.n_pursuers)]
         self.last_dones = [False for _ in range(self.n_pursuers)]
         self.last_obs = obs_list
 
         return obs_list[0]
 
     def _calculate_rewards(self):
-        self.rewards = [0 for _ in range(self.n_pursuers)]
-        
-        for i in range(self.n_pursuers):
-            pursuer = self.pursuers[i]
+        for i, pursuer in enumerate(self.pursuers):
             # Base reward from food, poison, etc.
             base_reward = self.behavior_rewards[i] + self.control_rewards[i]
             
@@ -452,6 +452,18 @@ class WaterworldBase:
                 + global_reward * (1 - self.local_ratio)
             )
 
+        # Update last_rewards
+        self.last_rewards = self.rewards.copy()
+
+    
+    def _spawn_evader(self):
+        x, y = self._generate_coord(2 * self.base_radius)
+        vx, vy = self._generate_speed(self.evader_speed)
+        return Evaders(x, y, vx, vy, radius=2 * self.base_radius,
+                       collision_type=len(self.evaders) + 1000,
+                       max_speed=self.evader_speed,
+                       nutrition=random.uniform(0.1, 0.5))
+
     def step(self, action, agent_id, is_last):
         action = np.asarray(action) * self.pursuer_max_accel
         action = action.reshape(2)
@@ -467,7 +479,7 @@ class WaterworldBase:
             -p.max_speed,
             p.max_speed,
         )
-        p.body.velocity = _velocity
+        p.body.velocity = tuple(_velocity)
 
         # Calculate thrust penalty (control reward)
         accel_penalty = self.thrust_penalty * math.sqrt((action**2).sum())
@@ -488,36 +500,41 @@ class WaterworldBase:
             # Reset behavior rewards
             self.behavior_rewards = [0 for _ in range(self.n_pursuers)]
 
-            # Handle food consumption and calculate behavior rewards
             for evader in self.evaders:
                 pursuers_eating = [
                     pursuer for pursuer in self.pursuers
                     if pursuer.distance_to(evader) < pursuer.radius + evader.shape.radius
+                    and pursuer.satiety < pursuer.max_satiety  # Only include pursuers that aren't fully satiated
                 ]
-                total_satiety = sum(pursuer.satiety for pursuer in pursuers_eating)
                 
-                if total_satiety > evader.nutrition:
+                if pursuers_eating:
                     # Food is consumed
+                    nutrition_per_pursuer = evader.nutrition / len(pursuers_eating)
                     for pursuer in pursuers_eating:
-                        pursuer.eat(evader.nutrition / len(pursuers_eating))
+                        pursuer.eat(nutrition_per_pursuer)
                         pursuer_index = self.pursuers.index(pursuer)
-                        self.behavior_rewards[pursuer_index] += self.food_reward
+                        self.behavior_rewards[pursuer_index] += int(self.food_reward)
                     evader.eaten = True
                 else:
                     # Food is encountered but not consumed
-                    for pursuer in pursuers_eating:
-                        pursuer_index = self.pursuers.index(pursuer)
-                        self.behavior_rewards[pursuer_index] += self.encounter_reward
-
+                    for pursuer in self.pursuers:
+                        if pursuer.distance_to(evader) < pursuer.sensor_range:
+                            pursuer_index = self.pursuers.index(pursuer)
+                            self.behavior_rewards[pursuer_index] += int(self.encounter_reward)
+    
             # Handle poison collisions
             for poison in self.poisons:
                 for pursuer in self.pursuers:
                     if pursuer.distance_to(poison) < pursuer.radius + poison.shape.radius:
                         pursuer_index = self.pursuers.index(pursuer)
-                        self.behavior_rewards[pursuer_index] += self.poison_reward
+                        self.behavior_rewards[pursuer_index] += int(self.poison_reward)
                         # Reset poison position
                         x, y = self._generate_coord(poison.shape.radius)
                         poison.body.position = x, y
+
+            for pursuer in self.pursuers:
+                pursuer.shape.food_indicator = 0
+                pursuer.shape.poison_indicator = 0
 
             # Remove eaten evaders and spawn new ones
             self.evaders = [evader for evader in self.evaders if not evader.eaten]
@@ -531,6 +548,7 @@ class WaterworldBase:
             self.frames += 1
 
         return self.observe(agent_id)
+    
 
     def observe(self, agent_id):
         return np.array(self.last_obs[agent_id], dtype=np.float32)

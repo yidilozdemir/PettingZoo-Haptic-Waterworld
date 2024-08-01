@@ -59,7 +59,7 @@ class MovingObject:
 
 
 class Evaders(MovingObject):
-    def __init__(self, x, y, vx, vy, radius=0.03, collision_type=2, max_speed=100):
+    def __init__(self, x, y, vx, vy, radius=0.03, collision_type=2, max_speed=100, nutrition=2):
         super().__init__(x, y, radius=radius)
 
         self.body.velocity = vx, vy
@@ -69,7 +69,13 @@ class Evaders(MovingObject):
         self.shape.counter = 0
         self.shape.max_speed = max_speed
         self.shape.density = 0.01
+        self.nutrition=nutrition
+        self.eaten=False
 
+    def reset(self, x, y, vx, vy):
+        self.body.position = x, y
+        self.body.velocity = vx, vy
+        self.eaten = False  # Reset eaten state
 
 class Poisons(MovingObject):
     def __init__(
@@ -96,6 +102,7 @@ class Pursuers(MovingObject):
         sensor_range=0.2,
         collision_type=1,
         speed_features=True,
+        max_satiety = 1.5,
         initial_satiety=0.5,
         initial_arousal=0.0,
         satiety_decay_rate=0.01,
@@ -115,6 +122,7 @@ class Pursuers(MovingObject):
 
         self.satiety = initial_satiety
         self.arousal = initial_arousal
+        self.max_satiety = max_satiety
         self.satiety_decay_rate = satiety_decay_rate
         self.arousal_decay_rate = arousal_decay_rate
         self.haptic_modulation_type = haptic_modulation_type
@@ -147,12 +155,16 @@ class Pursuers(MovingObject):
     def update(self, dt, other_pursuers, evaders):
 
         # Update position
-        self.body.position += self.body.velocity * dt
+        velocity = tuple(self.body.velocity)
+        self.body.position += pymunk.Vec2d(velocity[0] * dt, velocity[1] * dt)
 
         # Calculate arousal based on nearby pursuers and social haptic modulation due to these contacts
         self.social_haptic_modulation = 0
         pursuers_in_contact = [self]
         total_arousal = self.arousal
+        max_arousal = self.arousal
+        min_arousal = self.arousal
+
         for other in other_pursuers:
             if other != self and self.distance_to(other) < self.radius + other.radius:
                 pursuers_in_contact.append(other)
@@ -181,15 +193,13 @@ class Pursuers(MovingObject):
         ]
 
         #Update arouusal influenced both by hunger and arousal modulation coming from haptic contact
-        hunger = 1 - self.satiety
+        hunger = self.max_satiety - self.satiety
         self.arousal += hunger * 0.01 * dt + self.social_haptic_modulation
         self.arousal = np.clip(self.arousal, -1, 1)
 
          # Update satiety and radius
         satiety_decrease_rate = 0.05 * (1 + self.arousal)
         self.satiety = max(self.satiety - satiety_decrease_rate * dt, 0)
-        self.radius = max(self.satiety * 10, 1)  # Ensure a minimum radius
-        self.shape.unsafe_set_radius(self.radius)
         
         # Decay and clip arousal
         if self.arousal > 0:
@@ -206,9 +216,7 @@ class Pursuers(MovingObject):
 
     def eat(self, food_nutrition):
         previous_satiety = self.satiety
-        self.satiety = min(1, self.satiety + food_nutrition)
-        
-        # Eating success impacts arousal
+        self.satiety = min(self.max_satiety, self.satiety + food_nutrition)
         satiety_change = self.satiety - previous_satiety
         self.arousal += satiety_change * 0.5  # Increase arousal on successful eating
         self.arousal = np.clip(self.arousal, -1, 1)
