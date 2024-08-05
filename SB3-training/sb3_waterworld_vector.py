@@ -23,7 +23,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.results_plotter import load_results, ts2xy
 from stable_baselines3.common.evaluation import evaluate_policy
 from pettingzoo.utils.conversions import aec_to_parallel
-from stable_baselines3.common.callbacks import EvalCallback
+from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnNoModelImprovement
 
 import numpy as np 
 
@@ -115,60 +115,80 @@ class RealTimePlottingCallback(BaseCallback):
                         
         return True
     
-
-class PlottingCallback(BaseCallback):
+class PlottingCallbackMetrics(BaseCallback):
     def __init__(self, log_dir, verbose=1):
-        super(PlottingCallback, self).__init__(verbose)
+        super(PlottingCallbackMetrics, self).__init__(verbose)
         self.log_dir = log_dir
-        self.all_rewards = []
+        self.timesteps = []
+        self.rewards = []
+        self.entropies = []
         self.moving_avg_window = 100
-        self.best_mean_reward = -np.inf
-        self.best_model_step = 0
 
     def _on_step(self) -> bool:
+        # Store current timestep
+        self.timesteps.append(self.num_timesteps)
+
+        # Get episode reward
         x, y = ts2xy(load_results(self.log_dir), 'timesteps')
         if len(x) > 0:
-            self.all_rewards = y
-            # Compute moving average
-            moving_avg = (
-                np.convolve(y, np.ones(self.moving_avg_window), 'valid') / self.moving_avg_window
-            )
-            # Check if we have a new best model
-            if len(moving_avg) > 0:
-                mean_reward = moving_avg[-1]
-                if mean_reward > self.best_mean_reward:
-                    self.best_mean_reward = mean_reward
-                    self.best_model_step = x[-1]
+            self.rewards.append(y[-1])
+        else:
+            self.rewards.append(0)  # No reward data available yet
+
+        # Get the current policy entropy
+        if hasattr(self.model, 'policy') and hasattr(self.model.policy, 'entropy'):
+            current_entropy = self.model.policy.entropy().mean().item()
+            self.entropies.append(current_entropy)
+        else:
+            self.entropies.append(0)  # No entropy data available
+
         return True
 
     def on_training_end(self) -> None:
-        # Plot the rewards
-        plt.figure(figsize=(12, 6))
-        plt.plot(self.all_rewards, label='Reward', alpha=0.5)
+        # Plot the rewards and entropy
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 12), sharex=True)
+
+        # Plot rewards
+        ax1.plot(self.timesteps, self.rewards, label='Episode Reward', alpha=0.5)
         
-        # Plot the moving average
-        x = range(len(self.all_rewards))
-        moving_avg = (
-            np.convolve(self.all_rewards, np.ones(self.moving_avg_window), 'valid') 
-            / self.moving_avg_window
-        )
-        plt.plot(x[self.moving_avg_window-1:], moving_avg, label=f'{self.moving_avg_window}-episode Moving Average')
+        # Plot the moving average of rewards
+        if len(self.rewards) >= self.moving_avg_window:
+            moving_avg = np.convolve(self.rewards, np.ones(self.moving_avg_window), 'valid') / self.moving_avg_window
+            ax1.plot(self.timesteps[self.moving_avg_window-1:], moving_avg, 
+                     label=f'{self.moving_avg_window}-episode Moving Average')
         
-        # Mark the best model
-        plt.axvline(x=self.best_model_step, color='r', linestyle='--', 
-                    label=f'Best Model (Step {self.best_model_step})')
-        
-        plt.xlabel('Timesteps')
-        plt.ylabel('Rewards')
-        plt.title('Training Progress')
-        plt.legend()
-        plt.grid(True)
-        plt.savefig(f"{self.log_dir}/training_progress.png")
+        ax1.set_ylabel('Rewards')
+        ax1.set_title('Training Progress')
+        ax1.legend()
+        ax1.grid(True)
+
+        # Plot entropy
+        ax2.plot(self.timesteps, self.entropies, label='Policy Entropy', color='g')
+        ax2.set_xlabel('Timesteps')
+        ax2.set_ylabel('Entropy')
+        ax2.set_title('Policy Entropy Over Time')
+        ax2.legend()
+        ax2.grid(True)
+
+        plt.tight_layout()
+        plt.savefig(f"{self.log_dir}/training_progress_metrics.png")
         plt.close()
 
         if self.verbose > 0:
-            print(f"Training progress plot saved to {self.log_dir}/training_progress.png")
-            print(f"Best model was at step {self.best_model_step} with moving average reward {self.best_mean_reward:.2f}")
+            print(f"Training progress plot saved to {self.log_dir}/training_progress_metrics.png")
+            print(f"Final reward: {self.rewards[-1]:.2f}")
+            print(f"Final policy entropy: {self.entropies[-1]:.4f}")
+
+        # Save metrics to CSV
+        import pandas as pd
+        df = pd.DataFrame({
+            'timestep': self.timesteps,
+            'reward': self.rewards,
+            'entropy': self.entropies
+        })
+        df.to_csv(f"{self.log_dir}/training_metrics.csv", index=False)
+        if self.verbose > 0:
+            print(f"Training metrics saved to {self.log_dir}/training_metrics.csv")
 
 def plot_results(log_folder, title="Learning Curve"):
     episode_rewards = np.load(os.path.join(log_folder, "episode_rewards.npy"))
@@ -215,6 +235,8 @@ def train_butterfly_supersuit(
         return env
     # Create training environment
     train_env = create_env(num_envs=8)
+    
+
     print(f"Starting training on {str(train_env.unwrapped.metadata['name'])}.")
 
     # Create evaluation environment
@@ -225,28 +247,68 @@ def train_butterfly_supersuit(
     log_dir = f"./logs/{train_env.unwrapped.metadata.get('name')}_{timestamp}"
     os.makedirs(log_dir, exist_ok=True)
 
-    # Wrap the training environment with Monitor
     train_env = VecMonitor(train_env, log_dir)
+    
+    def linear_schedule(initial_value: float, final_value: float, total_timesteps: int):
+        """
+        Linear learning rate schedule.
+        
+        :param initial_value: Initial learning rate.
+        :param final_value: Final learning rate.
+        :param total_timesteps: Total number of timesteps.
+        :return: schedule that computes current learning rate depending on remaining timesteps
+        """
+        def func(progress_remaining: float) -> float:
+            """
+            Progress will decrease from 1 (beginning) to 0.
+            
+            :param progress_remaining:
+            :return: current learning rate
+            """
+            return final_value + progress_remaining * (initial_value - final_value)
+        
+        return func
 
-    # Create callbacks
-    eval_callback = EvalCallback(eval_env, 
-                                best_model_save_path=log_dir,
-                                log_path=log_dir, 
-                                eval_freq=10000,  # Adjust as needed
-                                deterministic=True, 
-                                render=False)
+    # Your existing setup code here...
 
-    plotting_callback = PlottingCallback(log_dir)
+    total_timesteps = 5_000_000  # 5 million timesteps
+    eval_freq = 100_000  # Evaluate every 100,000 steps
 
-    # Combine callbacks
+    # Create the learning rate schedule
+    learning_rate = linear_schedule(initial_value=3e-4, final_value=1e-5, total_timesteps=total_timesteps)
+
+    eval_callback = EvalCallback(
+        eval_env, 
+        best_model_save_path=log_dir,
+        log_path=log_dir, 
+        eval_freq=eval_freq,
+        n_eval_episodes=10,
+        deterministic=True, 
+        render=False,
+        verbose=1
+    )
+    
+    # Create the early stopping callback
+    stop_train_callback = StopTrainingOnNoModelImprovement(
+        max_no_improvement_evals=5,
+        min_evals=20,
+        verbose=1
+    )
+
+    # Combine EvalCallback and StopTrainingOnNoModelImprovement
+    callback_on_best = StopTrainingOnNoModelImprovement(max_no_improvement_evals=5, min_evals=20, verbose=1)
+    eval_callback = EvalCallback(eval_env, callback_on_new_best=callback_on_best, eval_freq=eval_freq,
+                                best_model_save_path=log_dir, deterministic=True, render=False)
+
+    # Your plotting callback
+    plotting_callback = PlottingCallbackMetrics(log_dir)
+
+    # Combine all callbacks
     callbacks = [eval_callback, plotting_callback]
 
-    # Create and train the model
-    model = PPO("MlpPolicy", train_env, verbose=3,
-        learning_rate=1e-3,
-        batch_size=256,
-    )
-    model.learn(total_timesteps=1000000, callback=callbacks)  # Adjust total_timesteps as needed
+    # Create and train the model with the learning rate schedule
+    model = PPO("MlpPolicy", train_env, verbose=1, learning_rate=learning_rate)
+    model.learn(total_timesteps=total_timesteps, callback=callbacks)
 
     print("Model has been saved.")
     print(f"Finished training on {str(train_env.unwrapped.metadata['name'])}.")
@@ -478,24 +540,24 @@ def call_eval(n_evaluations = 5):
 
 
 if __name__ == "__main__":
-    env_fn = waterworld_model1
+    env_fn = waterworld_v4
     env_kwargs = {}
 
     # Train a model (takes ~3 minutes on GPU)
     #train_butterfly_supersuit(env_fn, steps=196_608, seed=0, **env_kwargs)
 
     # Evaluate 10 games (average reward should be positive but can vary significantly)
-    #log_dir = train_butterfly_supersuit(env_fn, steps=196_608, seed=0, **env_kwargs)
+    log_dir = train_butterfly_supersuit(env_fn, steps=196_608, seed=0, **env_kwargs)
     
     # Plot the results
     from stable_baselines3.common import results_plotter
     results_plotter.plot_results(
-        ['./logs/waterworld_model1_20240801-204746'], 196_608, results_plotter.X_TIMESTEPS, "PPO Waterworld"
+        [log_dir], 196_608, results_plotter.X_TIMESTEPS, "PPO Waterworld"
     )
 
     # Watch 2 games
     #eval(env_fn, num_games=10, render_mode=None, **env_kwargs)
-    call_eval()
+    #call_eval()
     #plot_results_custom(log_dir)
     
     
