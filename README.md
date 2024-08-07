@@ -70,11 +70,14 @@ https://github.com/yidilozdemir/PettingZoo-Haptic-Waterworld/blob/main/pettingzo
 
 
 ```
-self.satiety = initial_satiety
+        self.satiety = initial_satiety
         self.arousal = initial_arousal
+        self.max_satiety = max_satiety
         self.satiety_decay_rate = satiety_decay_rate
         self.arousal_decay_rate = arousal_decay_rate
         self.haptic_modulation_type = haptic_modulation_type
+        self.satiety_arousal_rate = satiety_arousal_rate
+        
 ```
 
 Logic that updates these variables in each action step is inside the `update` function
@@ -121,11 +124,12 @@ def update(self, dt, other_pursuers, evaders):
         self.arousal += hunger * 0.01 * dt + self.social_haptic_modulation
         self.arousal = np.clip(self.arousal, -1, 1)
 
-         # Update satiety and radius
+         # Update satiety 
         satiety_decrease_rate = 0.05 * (1 + self.arousal)
         self.satiety = max(self.satiety - satiety_decrease_rate * dt, 0)
-        self.radius = max(self.satiety * 10, 1)  # Ensure a minimum radius
-        self.shape.unsafe_set_radius(self.radius)
+        #radius doesnt change on satiety but TODO for arousal increasing sensor change 
+        #self.radius = max(self.satiety * 10, 1)  # Ensure a minimum radius
+        #self.shape.unsafe_set_radius(self.radius)
         
         # Decay and clip arousal
         if self.arousal > 0:
@@ -144,8 +148,7 @@ def eat(self, food_nutrition):
         self.satiety = min(1, self.satiety + food_nutrition)
         
         # Eating success impacts arousal
-        satiety_change = self.satiety - previous_satiety
-        self.arousal += satiety_change * 0.5  # Increase arousal on successful eating
+        self.arousal += self.satiety_arousal_rate  # Set to 0 so no change in arousal from eating behaviour
         self.arousal = np.clip(self.arousal, -1, 1)
 
 ````
