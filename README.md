@@ -28,40 +28,58 @@ The Waterworld environment contains "pursuers", agents, whose primary goal is to
 
 ##### Satiety and arousal:
 
-When satiety increases (during eating), it causes a short-term increase in arousal.
 When satiety is low (high hunger), it causes a gradual increase in arousal over time. 
 When arousal is high, it causes a faster decay rate in satiety resulting in lower satiety.
 
 This creates an interesting dynamic:
-Eating (increasing satiety) gives a quick boost to arousal.
 Being hungry (low satiety) slowly increases arousal over time.
-This system models both the immediate stimulation from eating and the growing agitation from prolonged hunger. The balance between these effects, along with the social modulation and other factors, contributes to the complex behavior of the agents in your simulation.
+Having more arousal makes the agent more hungry over time. 
+
+We currently do not have an arousal boost from eating, to keep the system relatively straightforward to study. For future work in this direction, that is kept as a variable in system `satiety_arousal_rate` which is set to 0. That case could create a more realistic scenario where this system models both the immediate stimulation from eating and the growing agitation from prolonged hunger. The balance between these effects, along with the social modulation and other factors, contributes to the complex behavior of the agents in your simulation.
+
+Here, the cyclical relationship between satiety and arousal is expected to continue driving the food seeking behaviour. 
 
 #####  Eating and satiety:
 
-Eating increases satiety if the agent's satiety is below the maximum value
+Eating increases satiety if the agent's satiety is below the maximum value. 
 
 #####  Eating and arousal:
 
-Eating is a social activity in this simulation. It requires multiple pursuers to be in close proximity to the food source, thus the arousal gets affected in two main ways; a) The act of eating (increasing satiety) b) The social contact with other pursuers (through haptic modulation)
+Eating is a social activity in this simulation. It requires multiple pursuers to be in close proximity to the food source, thus the arousal gets affected in two main ways; a) The act of eating (increasing satiety which creates a faster decay in arousal over time) b) The social contact with other pursuers (through haptic modulation)
 
 This creates a more complex dynamic where:
 Hungry pursuers need to not only find food but also coordinate with other pursuers to actually consume it.
 The act of eating inherently involves social interaction, which affects arousal through both food consumption and social modulation.
-The arousal changes from eating and social contact happen simultaneously, potentially amplifying or dampening each other's effects.
+The arousal changes from eating and social contact happen at the same time, but the change coming from the eating behaviour is more spread over time, potentially amplifying or dampening each other's effects.
 
 #####  Social contact and arousal-satiety: 
 
-Causal chains become harder to trace due to the complex nature, and we aim to investigate and reason with this in our simulation: 
 Social contact pulls the arousal of the agents in contact to the average of the group (average mode) In this scenario, after a contact, based on whether agent's arousal rate got higher or lower, different behaviours can emerge: 
-1. Agent's arousal rate increases after contact -> lower satiety -> less rewards/agents might be encouraged seek more rewards while arousal increases, is penalised -> to decrease/modulate arousal social contact can happen or food might be preferred at the expense of arousal penalty, entering a fast satiety decay/food eating cyclic behaviour
-2. Agent's arousal rate decreases after contact -> higher satiety -> more rewards recieved -> which can encourage more haptic contact 
+1. Agent's arousal rate increases after contact during eating -> high satiety from eating but fast decay -> arousal overall gets higher, which is penalising -> to decrease/modulate arousal social contact can happen or food might be preferred, entering a fast satiety decay/food eating cyclic behaviour
+2. Agent's arousal rate decreases after contact -> high satiety from food and can be sustained more due to low arousal, which is also rewarding -> which can encourage less eating 
+
+### Analysis Strategy
+Dynamics become harder to reason, and we will test across conditions to pick them apart:
+
+1)  No arousal modulation vs arousal modulation only in no-food contact vs arousal modulation in food contact
+2)  Training with arousal modulation vs training with no arousal modulation -> then testing with no arousal modulation to see if this encouraged more or less cooperative behaviour 
 
 ##### Social eating mechanic adds another layer of complexity to the system, potentially leading to interesting emergent behaviors like:
 
 Pursuers clustering around food sources
 Coordination or competition between pursuers for eating opportunities
 Complex arousal dynamics due to the combination of eating and social effects
+
+#### Metrics
+- visual observation
+- average rewards, across and between agents
+- Median rewards across eval runs + standard deviation
+- Tracking satiety and arousal before/after episode, and standard deviation throughout episode as a marker for how stable it was for each agent
+
+Plotting ideas in eval and training round
+- physical contact across episode
+- food eating across episode
+- 
 
 #### The code for this environment
 
@@ -70,11 +88,14 @@ https://github.com/yidilozdemir/PettingZoo-Haptic-Waterworld/blob/main/pettingzo
 
 
 ```
-self.satiety = initial_satiety
+        self.satiety = initial_satiety
         self.arousal = initial_arousal
+        self.max_satiety = max_satiety
         self.satiety_decay_rate = satiety_decay_rate
         self.arousal_decay_rate = arousal_decay_rate
         self.haptic_modulation_type = haptic_modulation_type
+        self.satiety_arousal_rate = satiety_arousal_rate
+        
 ```
 
 Logic that updates these variables in each action step is inside the `update` function
@@ -121,11 +142,12 @@ def update(self, dt, other_pursuers, evaders):
         self.arousal += hunger * 0.01 * dt + self.social_haptic_modulation
         self.arousal = np.clip(self.arousal, -1, 1)
 
-         # Update satiety and radius
+         # Update satiety 
         satiety_decrease_rate = 0.05 * (1 + self.arousal)
         self.satiety = max(self.satiety - satiety_decrease_rate * dt, 0)
-        self.radius = max(self.satiety * 10, 1)  # Ensure a minimum radius
-        self.shape.unsafe_set_radius(self.radius)
+        #radius doesnt change on satiety but TODO for arousal increasing sensor change 
+        #self.radius = max(self.satiety * 10, 1)  # Ensure a minimum radius
+        #self.shape.unsafe_set_radius(self.radius)
         
         # Decay and clip arousal
         if self.arousal > 0:
@@ -144,8 +166,7 @@ def eat(self, food_nutrition):
         self.satiety = min(1, self.satiety + food_nutrition)
         
         # Eating success impacts arousal
-        satiety_change = self.satiety - previous_satiety
-        self.arousal += satiety_change * 0.5  # Increase arousal on successful eating
+        self.arousal += self.satiety_arousal_rate  # Set to 0 so no change in arousal from eating behaviour
         self.arousal = np.clip(self.arousal, -1, 1)
 
 ````
