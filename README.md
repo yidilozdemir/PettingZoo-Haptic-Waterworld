@@ -70,6 +70,17 @@ Pursuers clustering around food sources
 Coordination or competition between pursuers for eating opportunities
 Complex arousal dynamics due to the combination of eating and social effects
 
+#### Metrics
+- visual observation
+- average rewards, across and between agents
+- Median rewards across eval runs + standard deviation
+- Tracking satiety and arousal before/after episode, and standard deviation throughout episode as a marker for how stable it was for each agent
+
+Plotting ideas in eval and training round
+- physical contact across episode
+- food eating across episode
+- 
+
 #### The code for this environment
 
 1)  Models: define Pursuers agent and other "objects" in the environment
