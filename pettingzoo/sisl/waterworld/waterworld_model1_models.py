@@ -134,6 +134,7 @@ class Pursuers(MovingObject):
             0  # 1 if food touched as this step, 0 otherwise
         )
         self.shape.poison_indicator = 0  # 1 if poisoned this step, 0 otherwise
+        self.shape.social_touch_indicator = 0
 
         # Generate self.n_sensors angles, evenly spaced from 0 to 2pi
         # We generate 1 extra angle and remove it because linspace[0] = 0 = 2pi = linspace[-1]
@@ -154,11 +155,7 @@ class Pursuers(MovingObject):
             self.sensor_obs_coord + 2
         )  # +1 for is_colliding_evader, +1 for is_colliding_poison
     
-    def update(self, dt, other_pursuers, evaders):
-
-        # Update position
-        velocity = tuple(self.body.velocity)
-        self.body.position += pymunk.Vec2d(velocity[0] * dt, velocity[1] * dt)
+    def update_awareness(self, dt, other_pursuers, evaders):
 
         # Calculate arousal based on nearby pursuers and social haptic modulation due to these contacts
         self.social_haptic_modulation = 0
@@ -168,7 +165,12 @@ class Pursuers(MovingObject):
         min_arousal = self.arousal
 
         for other in other_pursuers:
-            if other != self and self.distance_to(other) < self.radius + other.radius:
+            #not a very good implementation right now, only checking if there was a social touch, this works only in two 
+            #agent scenarios - BEWARE, TODO need to have an indicator for which was the other agent, couldnt implement it bc
+            #i dont have access to the indices from the shape of object. Probably worst case the commented out code below works
+            #but want to keep to the original code convention of using callback and touch indicators
+            if other != self and self.shape.social_touch_indicator >0 :
+            #self.distance_to(other) < self.radius + other.radius:
                 pursuers_in_contact.append(other)
                 total_arousal += other.arousal
                 max_arousal = max(max_arousal, other.arousal)
@@ -215,10 +217,10 @@ class Pursuers(MovingObject):
     def distance_to(self, other):
         return np.linalg.norm(np.array(self.body.position) - np.array(other.body.position))
     
-
+    # Eating behaviour here to update satiety
     def eat(self, food_nutrition):
         previous_satiety = self.satiety
-        self.satiety = min(self.max_satiety, self.satiety + food_nutrition)
+        self.satiety = min(self.max_satiety, previous_satiety + food_nutrition)
         self.arousal += self.satiety_arousal_rate 
         self.arousal = np.clip(self.arousal, -1, 1)
 

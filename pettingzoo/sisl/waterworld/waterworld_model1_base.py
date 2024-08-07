@@ -389,7 +389,7 @@ class WaterworldBase:
                             self.pursuers[j].shape.collision_type,
                         )
                     )
-                    self.handlers[-1].begin = self.return_false_begin_callback
+                    self.handlers[-1].begin = self.pursuer_pursuer_touch_callback
 
     def reset(self):
         self.add_obj()
@@ -484,6 +484,9 @@ class WaterworldBase:
         )
         p.body.velocity = tuple(_velocity)
 
+        # Set pursuer speed
+        p.reset_velocity(_velocity[0], _velocity[1])
+
         # Calculate thrust penalty (control reward)
         accel_penalty = self.thrust_penalty * math.sqrt((action**2).sum())
         self.control_rewards = (
@@ -496,9 +499,11 @@ class WaterworldBase:
         if is_last:
             # Update all pursuers
             for pursuer in self.pursuers:
-                pursuer.update(1 / self.FPS, self.pursuers, self.evaders)
+                pursuer.update_awareness(1 / self.FPS, self.pursuers, self.evaders)
 
             self.space.step(1 / self.FPS)
+            obs_list = self.observe_list()
+            self.last_obs = obs_list
 
             # Reset behavior rewards
             self.behavior_rewards = [0 for _ in range(self.n_pursuers)]
@@ -506,7 +511,7 @@ class WaterworldBase:
             for evader in self.evaders:
                 pursuers_eating = [
                     pursuer for pursuer in self.pursuers
-                    if pursuer.distance_to(evader) < pursuer.radius + evader.shape.radius
+                    if pursuer.shape.food_indicator != 0
                     and pursuer.satiety < pursuer.max_satiety  # Only include pursuers that aren't fully satiated
                 ]
                 
@@ -521,20 +526,24 @@ class WaterworldBase:
                 else:
                     # Food is encountered but not consumed
                     for pursuer in self.pursuers:
-                        if pursuer.distance_to(evader) < pursuer.sensor_range:
+                        if pursuer.shape.food_touched_indicator > 0:
                             pursuer_index = self.pursuers.index(pursuer)
                             self.behavior_rewards[pursuer_index] += int(self.encounter_reward)
     
             # Handle poison collisions
             for poison in self.poisons:
                 for pursuer in self.pursuers:
-                    if pursuer.distance_to(poison) < pursuer.radius + poison.shape.radius:
+                    if pursuer.shape.poison_indicator > 0:
                         pursuer_index = self.pursuers.index(pursuer)
                         self.behavior_rewards[pursuer_index] += int(self.poison_reward)
                         # Reset poison position
                         x, y = self._generate_coord(poison.shape.radius)
                         poison.body.position = x, y
+            
+            # Calculate final rewards
+            self._calculate_rewards()
 
+            #Reset encounter indicators
             for pursuer in self.pursuers:
                 pursuer.shape.food_indicator = 0
                 pursuer.shape.poison_indicator = 0
@@ -544,8 +553,6 @@ class WaterworldBase:
             while len(self.evaders) < self.n_evaders:
                 self.evaders.append(self._spawn_evader())
 
-            # Calculate final rewards
-            self._calculate_rewards()
 
             # Update frames
             self.frames += 1
@@ -784,6 +791,19 @@ class WaterworldBase:
 
         pursuer_shape.food_touched_indicator -= 1
 
+    def pursuer_pursuer_touch_callback(self, arbiter, space, data):
+        """Called when a collision between a pursuer and a pursuer occurs.
+
+        The counter of the evader increases by 1, if the counter reaches
+        n_coop, then, the pursuer catches the evader and gets a reward.
+        """
+        pursuer_shape, other_pursuer_shape = arbiter.shapes
+
+        # Indicate that food is touched by pursuer
+        pursuer_shape.social_touch_indicator += 1
+
+        return False
+    
     def return_false_begin_callback(self, arbiter, space, data):
         """Callback function that simply returns False."""
         return False
