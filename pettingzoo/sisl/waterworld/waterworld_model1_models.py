@@ -107,7 +107,8 @@ class Pursuers(MovingObject):
         initial_arousal=0.0,
         satiety_decay_rate=0.01,
         arousal_decay_rate=0.005,
-        haptic_modulation_type="average"
+        haptic_modulation_type="average",
+        satiety_arousal_rate=0
     ):  
         super().__init__(x, y, radius=radius)
 
@@ -126,6 +127,7 @@ class Pursuers(MovingObject):
         self.satiety_decay_rate = satiety_decay_rate
         self.arousal_decay_rate = arousal_decay_rate
         self.haptic_modulation_type = haptic_modulation_type
+        self.satiety_arousal_rate = satiety_arousal_rate
 
         self.shape.food_indicator = 0  # 1 if food caught at this step, 0 otherwise
         self.shape.food_touched_indicator = (
@@ -217,8 +219,7 @@ class Pursuers(MovingObject):
     def eat(self, food_nutrition):
         previous_satiety = self.satiety
         self.satiety = min(self.max_satiety, self.satiety + food_nutrition)
-        satiety_change = self.satiety - previous_satiety
-        self.arousal += satiety_change * 0.5  # Increase arousal on successful eating
+        self.arousal += self.satiety_arousal_rate 
         self.arousal = np.clip(self.arousal, -1, 1)
 
     @property

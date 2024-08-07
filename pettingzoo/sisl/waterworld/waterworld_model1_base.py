@@ -48,6 +48,7 @@ class WaterworldBase:
         satiety_reward_factor=5.0, 
         arousal_penalty_factor=2.0,
         haptic_modulation_type="average",
+        satiety_arousal_rate=0,
     ):
         """Input keyword arguments.
 
@@ -99,6 +100,7 @@ class WaterworldBase:
         self.satiety_reward_factor = satiety_reward_factor
         self.arousal_penalty_factor = arousal_penalty_factor
         self.haptic_modulation_type = haptic_modulation_type
+        self.satiety_arousal_rate = satiety_arousal_rate
 
         self.encounter_reward = encounter_reward
         self.food_reward = food_reward
@@ -177,6 +179,7 @@ class WaterworldBase:
                     sensor_range=self.sensor_range,
                     speed_features=self.speed_features,
                     haptic_modulation_type=self.haptic_modulation_type,
+                    satiety_arousal_rate=self.satiety_arousal_rate
                 )
             )
 
