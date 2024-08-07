@@ -60,9 +60,9 @@ Social contact pulls the arousal of the agents in contact to the average of the 
 
 ### Analysis Strategy
 Dynamics become harder to reason, and we will test across conditions to pick them apart:
-No arousal modulation vs arousal modulation only in no-food contact vs arousal modulation in food contact 
-+
-Training with arousal modulation vs training with no arousal modulation -> then testing with no arousal modulation to see if this encouraged more or less cooperative behaviour 
+
+1)  No arousal modulation vs arousal modulation only in no-food contact vs arousal modulation in food contact
+2)  Training with arousal modulation vs training with no arousal modulation -> then testing with no arousal modulation to see if this encouraged more or less cooperative behaviour 
 
 ##### Social eating mechanic adds another layer of complexity to the system, potentially leading to interesting emergent behaviors like:
 
