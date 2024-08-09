@@ -123,6 +123,8 @@ class PlottingCallbackMetrics(BaseCallback):
         self.rewards = []
         self.entropies = []
         self.moving_avg_window = 100
+        self.arousal_history = []
+        self.satiety_history = []
 
     def _on_step(self) -> bool:
         # Store current timestep
@@ -141,6 +143,16 @@ class PlottingCallbackMetrics(BaseCallback):
             self.entropies.append(current_entropy)
         else:
             self.entropies.append(0)  # No entropy data available
+
+        # Collect arousal and satiety data
+        arousal_data = []
+        satiety_data = []
+        for pursuer in self.training_env.unwrapped.env.env.pursuers:
+            arousal_data.append(pursuer.arousal)
+            satiety_data.append(pursuer.satiety)
+        
+        self.arousal_history.append(arousal_data)
+        self.satiety_history.append(satiety_data)
 
         return True
 
@@ -187,8 +199,39 @@ class PlottingCallbackMetrics(BaseCallback):
             'entropy': self.entropies
         })
         df.to_csv(f"{self.log_dir}/training_metrics.csv", index=False)
+        
         if self.verbose > 0:
             print(f"Training metrics saved to {self.log_dir}/training_metrics.csv")
+
+        arousal_data = np.array(self.arousal_history)
+        satiety_data = np.array(self.satiety_history)
+
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 12))
+
+        # Plot arousal
+        for i in range(arousal_data.shape[1]):
+            ax1.plot(arousal_data[:, i], label=f'Agent {i+1}')
+        ax1.set_title('Arousal Levels Over Training')
+        ax1.set_xlabel('Step')
+        ax1.set_ylabel('Arousal')
+        ax1.legend()
+
+        # Plot satiety
+        for i in range(satiety_data.shape[1]):
+            ax2.plot(satiety_data[:, i], label=f'Agent {i+1}')
+        ax2.set_title('Satiety Levels Over Training')
+        ax2.set_xlabel('Step')
+        ax2.set_ylabel('Satiety')
+        ax2.legend()
+
+        plt.tight_layout()
+        plt.savefig(f"{self.log_dir}/arousal_satiety_plot.png")
+        plt.close()
+
+        # Save raw data
+        np.save(f"{self.log_dir}/arousal_history.npy", arousal_data)
+        np.save(f"{self.log_dir}/satiety_history.npy", satiety_data)
+
 
 def plot_results(log_folder, title="Learning Curve"):
     episode_rewards = np.load(os.path.join(log_folder, "episode_rewards.npy"))
