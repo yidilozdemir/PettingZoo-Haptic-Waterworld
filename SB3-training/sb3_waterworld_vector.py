@@ -16,6 +16,8 @@ from stable_baselines3 import PPO
 from stable_baselines3.ppo import MlpPolicy
 from scipy import stats
 
+import gymnasium as gym 
+
 from pettingzoo.sisl import waterworld_v4, waterworld_model1
 
 import matplotlib.pyplot as plt
@@ -26,8 +28,11 @@ from pettingzoo.utils.conversions import aec_to_parallel
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnNoModelImprovement
 
 import numpy as np 
+import pandas as pd
 
-from stable_baselines3.common.vec_env import VecMonitor
+from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
+
 
 def moving_average(values, window):
         """
@@ -59,61 +64,6 @@ def plot_results_custom(log_folder, title="Learning Curve"):
         plt.title(title + " Smoothed")
         plt.show()
 
-class RealTimePlottingCallback(BaseCallback):
-    def __init__(self, check_freq: int, log_dir: str, verbose=1, window_size=1000):
-        super().__init__(verbose)
-        self.check_freq = check_freq
-        self.log_dir = log_dir
-        self.save_path = os.path.join(log_dir, "best_model")
-        self.best_median_reward = -np.inf
-        self.window_size = window_size
-        self.rewards_history = []
-        
-        # Set up the plot
-        plt.ion()
-        self.fig, self.ax = plt.subplots()
-        self.line, = self.ax.plot([], [])
-        self.ax.set_xlabel('Timesteps')
-        self.ax.set_ylabel('Median Reward')
-        self.ax.set_title('Training Progress')
-
-    def _init_callback(self) -> None:
-        if self.save_path is not None:
-            os.makedirs(self.save_path, exist_ok=True)
-
-    def _on_step(self) -> bool:
-        if self.n_calls % self.check_freq == 0:
-            x, y = ts2xy(load_results(self.log_dir), "timesteps")
-            if len(x) > 0:
-                # Calculate median reward over the window
-                self.rewards_history.append(np.median(y[-self.window_size:]))
-                
-                # Update the plot
-                self.line.set_xdata(range(len(self.rewards_history)))
-                self.line.set_ydata(self.rewards_history)
-                self.ax.relim()
-                self.ax.autoscale_view()
-                self.fig.canvas.draw()
-                self.fig.canvas.flush_events()
-                
-                latest_median_reward = self.rewards_history[-1]
-                if self.verbose > 0:
-                    print(f"Num timesteps: {self.num_timesteps}")
-                    print(f"Best median reward: {self.best_median_reward:.2f} - Latest median reward: {latest_median_reward:.2f}")
-                
-                if latest_median_reward > self.best_median_reward:
-                    self.best_median_reward = latest_median_reward
-                    if self.verbose > 0:
-                        print(f"Saving new best model to {self.save_path}.zip")
-                    self.model.save(self.save_path)
-                
-                # Check for stability
-                if len(self.rewards_history) > 10:  # Wait for at least 10 data points
-                    recent_rewards = self.rewards_history[-10:]
-                    if np.std(recent_rewards) < 0.01 * np.mean(recent_rewards):  # If std dev is less than 1% of mean
-                        print("Training has stabilized. You may consider stopping.")
-                        
-        return True
     
 class PlottingCallbackMetrics(BaseCallback):
     def __init__(self, log_dir, verbose=1):
@@ -144,17 +94,19 @@ class PlottingCallbackMetrics(BaseCallback):
         else:
             self.entropies.append(0)  # No entropy data available
 
-        # Collect arousal and satiety data
-        arousal_data = []
-        satiety_data = []
-        for pursuer in self.training_env.unwrapped.env.env.pursuers:
-            arousal_data.append(pursuer.arousal)
-            satiety_data.append(pursuer.satiety)
-        
-        self.arousal_history.append(arousal_data)
-        self.satiety_history.append(satiety_data)
-
+        # Collect info data
+        if hasattr(self.training_env, 'get_attr'):
+            infos = self.training_env.get_attr('infos')
+            if infos:
+                for env_infos in infos:
+                    for agent, info in env_infos.items():
+                        for key, value in info.items():
+                            if key not in self.info_history:
+                                self.info_history[key] = []
+                            self.info_history[key].append(value)
+                            
         return True
+
 
     def on_training_end(self) -> None:
         # Plot the rewards and entropy
@@ -191,46 +143,94 @@ class PlottingCallbackMetrics(BaseCallback):
             print(f"Final reward: {self.rewards[-1]:.2f}")
             print(f"Final policy entropy: {self.entropies[-1]:.4f}")
 
+        # New: Plot info data
+        for key, values in self.info_history.items():
+            plt.figure(figsize=(12, 6))
+            plt.plot(self.timesteps[:len(values)], values, label=key)
+            plt.xlabel('Timesteps')
+            plt.ylabel(key)
+            plt.title(f'{key} Over Time')
+            plt.legend()
+            plt.grid(True)
+            plt.savefig(f"{self.log_dir}/{key}_over_time.png")
+            plt.close()
+
+        if self.verbose > 0:
+            print(f"Training progress plots saved to {self.log_dir}/")
+            print(f"Final reward: {self.rewards[-1]:.2f}")
+            print(f"Final policy entropy: {self.entropies[-1]:.4f}")
+
         # Save metrics to CSV
         import pandas as pd
         df = pd.DataFrame({
             'timestep': self.timesteps,
             'reward': self.rewards,
-            'entropy': self.entropies
+            'entropy': self.entropies,
+            **{key: values for key, values in self.info_history.items()}
         })
         df.to_csv(f"{self.log_dir}/training_metrics.csv", index=False)
-        
-        if self.verbose > 0:
-            print(f"Training metrics saved to {self.log_dir}/training_metrics.csv")
 
-        arousal_data = np.array(self.arousal_history)
-        satiety_data = np.array(self.satiety_history)
+class RecordObservationsCallback(BaseCallback):
+    def __init__(self, verbose=0):
+            super(RecordObservationsCallback, self).__init__(verbose)
+            self.arousal_history = []
+            self.satiety_history = []
+            self.rewards_history = []
+            self.timesteps = []
 
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 12))
+    def _on_step(self) -> bool:
+            # Access the base environments
+            base_envs = self.training_env.venv.envs[0]
 
-        # Plot arousal
-        for i in range(arousal_data.shape[1]):
-            ax1.plot(arousal_data[:, i], label=f'Agent {i+1}')
-        ax1.set_title('Arousal Levels Over Training')
-        ax1.set_xlabel('Step')
-        ax1.set_ylabel('Arousal')
-        ax1.legend()
+            arousal_values = []
+            satiety_values = []
 
-        # Plot satiety
-        for i in range(satiety_data.shape[1]):
-            ax2.plot(satiety_data[:, i], label=f'Agent {i+1}')
-        ax2.set_title('Satiety Levels Over Training')
-        ax2.set_xlabel('Step')
-        ax2.set_ylabel('Satiety')
-        ax2.legend()
+            for env in base_envs:
+                # Check if the base environment has the get_agent_states method
+                if hasattr(base_envs, 'get_agent_states'):
+                    agent_states = base_envs.get_agent_states()
+                    
+                    # Extract arousal and satiety from the agent states
+                    for agent_state in agent_states.values():
+                        arousal_values.append(agent_state.get('arousal', 0))
+                        satiety_values.append(agent_state.get('satiety', 0))
+                if base_envs.agent_states != None:
+                    agent_states = base_envs.agent_states
+                    
+                    # Extract arousal and satiety from the agent states
+                    for agent_state in agent_states.values():
+                        arousal_values.append(agent_state.get('arousal', 0))
+                        satiety_values.append(agent_state.get('satiety', 0)) 
+                else:
+                    print("Warning: get_agent_states method not found in the environment")
+            
+            # Record the mean values
+            if arousal_values:
+                self.arousal_history.append(np.mean(arousal_values))
+            if satiety_values:
+                self.satiety_history.append(np.mean(satiety_values))
+            
+            # Record the mean reward
+            self.rewards_history.append(np.mean(self.locals['rewards']))
+            
+            # Record the timestep
+            self.timesteps.append(self.num_timesteps)
 
-        plt.tight_layout()
-        plt.savefig(f"{self.log_dir}/arousal_satiety_plot.png")
-        plt.close()
+            return True
 
-        # Save raw data
-        np.save(f"{self.log_dir}/arousal_history.npy", arousal_data)
-        np.save(f"{self.log_dir}/satiety_history.npy", satiety_data)
+    def on_training_end(self) -> None:
+            # Create a DataFrame with the recorded data
+            df = pd.DataFrame({
+                'timestep': self.timesteps,
+                'mean_arousal': self.arousal_history,
+                'mean_satiety': self.satiety_history,
+                'mean_reward': self.rewards_history
+            })
+
+            # Save the DataFrame to a CSV file
+            os.makedirs('training_logs', exist_ok=True)
+            df.to_csv('training_logs/training_observations.csv', index=False)
+            print("Training observations saved to training_logs/training_observations.csv")
 
 
 def plot_results(log_folder, title="Learning Curve"):
@@ -270,12 +270,15 @@ def plot_episode_rewards(ax, rewards, episode_num):
 def train_butterfly_supersuit(
     env_fn, steps: int = 10_000, seed: int | None = 0, **env_kwargs
 ):
+
     def create_env(num_envs=8, for_eval=False):
         env = env_fn.parallel_env(**env_kwargs)
         env.reset(seed= seed + (1000 if for_eval else 0))  # Different seed for eval
         env = ss.pettingzoo_env_to_vec_env_v1(env)
         env = ss.concat_vec_envs_v1(env, num_envs, num_cpus=2, base_class="stable_baselines3")
         return env
+
+    
     # Create training environment
     train_env = create_env(num_envs=8)
     
@@ -289,9 +292,16 @@ def train_butterfly_supersuit(
     timestamp = time.strftime('%Y%m%d-%H%M%S')
     log_dir = f"./logs/{train_env.unwrapped.metadata.get('name')}_{timestamp}"
     os.makedirs(log_dir, exist_ok=True)
-
-    train_env = VecMonitor(train_env, log_dir)
     
+    # Wrap the vectorized environment with VecMonitor
+    env = VecMonitor(train_env, log_dir)
+
+    print(f"Starting training on {str(env.unwrapped.metadata['name'])}.")
+
+    # Create evaluation environment
+    eval_env = create_env(num_envs=1, for_eval=True)
+
+
     def linear_schedule(initial_value: float, final_value: float, total_timesteps: int):
         """
         Linear learning rate schedule.
@@ -312,7 +322,6 @@ def train_butterfly_supersuit(
         
         return func
 
-    # Your existing setup code here...
 
     total_timesteps = 5_000_000  # 5 million timesteps
     eval_freq = 100_000  # Evaluate every 100,000 steps
@@ -346,16 +355,18 @@ def train_butterfly_supersuit(
     # Your plotting callback
     plotting_callback = PlottingCallbackMetrics(log_dir)
 
+
     # Combine all callbacks
     callbacks = [eval_callback, plotting_callback]
 
+
     # Create and train the model with the learning rate schedule
-    model = PPO("MlpPolicy", train_env, verbose=1, learning_rate=learning_rate)
+    model = PPO("MlpPolicy", env, verbose=1, learning_rate=learning_rate)
     model.learn(total_timesteps=total_timesteps, callback=callbacks)
 
     print("Model has been saved.")
-    print(f"Finished training on {str(train_env.unwrapped.metadata['name'])}.")
-    train_env.close()
+    print(f"Finished training on {str(env.unwrapped.metadata['name'])}.")
+    env.close()
     eval_env.close()
 
     return log_dir
@@ -583,7 +594,7 @@ def call_eval(n_evaluations = 5):
 
 
 if __name__ == "__main__":
-    env_fn = waterworld_v4
+    env_fn = waterworld_model1
     env_kwargs = {}
 
     # Train a model (takes ~3 minutes on GPU)
@@ -598,8 +609,7 @@ if __name__ == "__main__":
         [log_dir], 196_608, results_plotter.X_TIMESTEPS, "PPO Waterworld"
     )
 
-    # Watch 2 games
-    #eval(env_fn, num_games=10, render_mode=None, **env_kwargs)
+    # Watch 2 games    #eval(env_fn, num_games=10, render_mode=None, **env_kwargs)
     #call_eval()
     #plot_results_custom(log_dir)
     

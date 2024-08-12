@@ -236,6 +236,7 @@ class raw_env(AECEnv, EzPickle):
         self._cumulative_rewards[self.agent_selection] = 0
         self.agent_selection = self._agent_selector.next()
         self._accumulate_rewards()
+        self.infos = self.env.agent_states 
 
         if self.render_mode == "human":
             self.render()

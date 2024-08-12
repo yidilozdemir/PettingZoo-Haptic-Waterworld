@@ -118,6 +118,8 @@ class WaterworldBase:
         self.last_rewards = [np.float64(0) for _ in range(self.n_pursuers)]
         self.rewards = [np.float64(0) for _ in range(self.n_pursuers)]
 
+        self.agent_states = {}
+
         if obstacle_coord is not None and len(obstacle_coord) != self.n_obstacles:
             raise ValueError("obstacle_coord does not have same length as n_obstacles")
         else:
@@ -130,6 +132,10 @@ class WaterworldBase:
         self.get_spaces()
         self._seed()
 
+    @property
+    def unwrapped(self):
+        return self
+    
     def get_spaces(self):
         """Define the action and observation spaces for all of the agents."""
         if self.speed_features:
@@ -427,8 +433,18 @@ class WaterworldBase:
         self.last_dones = [False for _ in range(self.n_pursuers)]
         self.last_obs = obs_list
 
+        # Store initial arousal and satiety
+        for i, pursuer in enumerate(self.pursuers):
+            self.agent_states[f"pursuer_{i}"] = {
+                "arousal": pursuer.arousal,
+                "satiety": pursuer.satiety
+            }
+
         return obs_list[0]
 
+    def get_agent_states(self):
+        return self.agent_states
+    
     def _calculate_rewards(self):
         for i, pursuer in enumerate(self.pursuers):
             # Base reward from food, poison, etc.
@@ -553,6 +569,12 @@ class WaterworldBase:
             while len(self.evaders) < self.n_evaders:
                 self.evaders.append(self._spawn_evader())
 
+            # Store arousal and satiety
+            for i, pursuer in enumerate(self.pursuers):
+                self.agent_states[f"pursuer_{i}"] = {
+                    "arousal": pursuer.arousal,
+                    "satiety": pursuer.satiety
+                }
 
             # Update frames
             self.frames += 1
@@ -560,7 +582,7 @@ class WaterworldBase:
         return self.observe(agent_id)
     
 
-    def observe(self, agent_id):
+    def observe(self, agent_id):     
         return np.array(self.last_obs[agent_id], dtype=np.float32)
 
     def observe_list(self):
@@ -841,3 +863,5 @@ class WaterworldBase:
             if self.render_mode == "rgb_array"
             else None
         )
+    
+    
