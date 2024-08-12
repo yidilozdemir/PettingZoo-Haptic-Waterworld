@@ -158,7 +158,7 @@ parallel_env = parallel_wrapper_fn(env)
 class raw_env(AECEnv, EzPickle):
     metadata = {
         "render_modes": ["human", "rgb_array"],
-        "name": "waterworld_v5",
+        "name": "waterworld_model1",
         "is_parallelizable": True,
         "render_fps": FPS,
     }
@@ -237,7 +237,6 @@ class raw_env(AECEnv, EzPickle):
         self.agent_selection = self._agent_selector.next()
         self._accumulate_rewards()
         self.infos = self.env.agent_states 
-
         if self.render_mode == "human":
             self.render()
 

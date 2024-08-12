@@ -94,17 +94,6 @@ class PlottingCallbackMetrics(BaseCallback):
         else:
             self.entropies.append(0)  # No entropy data available
 
-        # Collect info data
-        if hasattr(self.training_env, 'get_attr'):
-            infos = self.training_env.get_attr('infos')
-            if infos:
-                for env_infos in infos:
-                    for agent, info in env_infos.items():
-                        for key, value in info.items():
-                            if key not in self.info_history:
-                                self.info_history[key] = []
-                            self.info_history[key].append(value)
-                            
         return True
 
 
@@ -294,7 +283,7 @@ def train_butterfly_supersuit(
     os.makedirs(log_dir, exist_ok=True)
     
     # Wrap the vectorized environment with VecMonitor
-    env = VecMonitor(train_env, log_dir)
+    env = VecMonitor(train_env, log_dir, info_keywords = ['arousal', 'satiety', 'social_touch'])
 
     print(f"Starting training on {str(env.unwrapped.metadata['name'])}.")
 
@@ -323,7 +312,7 @@ def train_butterfly_supersuit(
         return func
 
 
-    total_timesteps = 5_000_000  # 5 million timesteps
+    total_timesteps = 500000  # 5 million timesteps
     eval_freq = 100_000  # Evaluate every 100,000 steps
 
     # Create the learning rate schedule

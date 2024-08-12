@@ -573,7 +573,8 @@ class WaterworldBase:
             for i, pursuer in enumerate(self.pursuers):
                 self.agent_states[f"pursuer_{i}"] = {
                     "arousal": pursuer.arousal,
-                    "satiety": pursuer.satiety
+                    "satiety": pursuer.satiety,
+                    "social_touch" : pursuer.social_haptic_modulation
                 }
 
             # Update frames
