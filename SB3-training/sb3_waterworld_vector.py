@@ -64,163 +64,151 @@ def plot_results_custom(log_folder, title="Learning Curve"):
         plt.title(title + " Smoothed")
         plt.show()
 
+class PlottingCallbackMetrics_MultiAgentMonitor(BaseCallback):
+    def __init__(self, log_dir, verbose=1):
+        super(PlottingCallbackMetrics, self).__init__(verbose)
+        self.log_dir = log_dir
+
+    def _on_step(self) -> bool:
+        return True
+
+    def _plot_metric(self, data, metric, agent):
+        plt.figure(figsize=(10, 5))
+        plt.plot(data['t'], data[f'{agent}_{metric}'])
+        plt.title(f'{agent} {metric} over time')
+        plt.xlabel('Timesteps')
+        plt.ylabel(metric.capitalize())
+        plt.savefig(f'{self.log_dir}/{agent}_{metric}_plot.png')
+        plt.close()
+
+    def on_training_end(self):
+        # Load the CSV file
+        df = pd.read_csv(f'{self.log_dir}/monitor.csv', skiprows=1)  # Skip the first row which contains metadata
+
+        agents = ['agent_0', 'agent_1']  # Adjust if you have different agent names
+        metrics = ['arousal', 'satiety', 'social_touch']
+
+        # Plot individual metrics for each agent
+        for agent in agents:
+            for metric in metrics:
+                self._plot_metric(df, metric, agent)
+
+            # Plot combined metrics for each agent
+            plt.figure(figsize=(12, 6))
+            for metric in metrics:
+                plt.plot(df['t'], df[f'{agent}_{metric}'], label=metric)
+            plt.title(f'{agent} metrics over time')
+            plt.xlabel('Timesteps')
+            plt.ylabel('Value')
+            plt.legend()
+            plt.savefig(f'{self.log_dir}/{agent}_combined_metrics.png')
+            plt.close()
+
+        # Plot reward (which is common for both agents)
+        plt.figure(figsize=(10, 5))
+        plt.plot(df['t'], df['r'])
+        plt.title('Reward over time')
+        plt.xlabel('Timesteps')
+        plt.ylabel('Reward')
+        plt.savefig(f'{self.log_dir}/reward_plot.png')
+        plt.close()
+
+        # Plot all metrics for both agents in one graph
+        plt.figure(figsize=(15, 8))
+        for agent in agents:
+            for metric in metrics:
+                plt.plot(df['t'], df[f'{agent}_{metric}'], label=f'{agent} {metric}')
+        plt.plot(df['t'], df['r'], label='Reward', linewidth=2)
+        plt.title('All metrics over time')
+        plt.xlabel('Timesteps')
+        plt.ylabel('Value')
+        plt.legend()
+        plt.savefig(f'{self.log_dir}/all_metrics_plot.png')
+        plt.close()
+
+        print(f"Plots saved in {self.log_dir}")
     
 class PlottingCallbackMetrics(BaseCallback):
     def __init__(self, log_dir, verbose=1):
         super(PlottingCallbackMetrics, self).__init__(verbose)
         self.log_dir = log_dir
-        self.timesteps = []
-        self.rewards = []
-        self.entropies = []
-        self.moving_avg_window = 100
-        self.arousal_history = []
-        self.satiety_history = []
 
     def _on_step(self) -> bool:
-        # Store current timestep
-        self.timesteps.append(self.num_timesteps)
-
-        # Get episode reward
-        x, y = ts2xy(load_results(self.log_dir), 'timesteps')
-        if len(x) > 0:
-            self.rewards.append(y[-1])
-        else:
-            self.rewards.append(0)  # No reward data available yet
-
-        # Get the current policy entropy
-        if hasattr(self.model, 'policy') and hasattr(self.model.policy, 'entropy'):
-            current_entropy = self.model.policy.entropy().mean().item()
-            self.entropies.append(current_entropy)
-        else:
-            self.entropies.append(0)  # No entropy data available
-
         return True
 
-
-    def on_training_end(self) -> None:
-        # Plot the rewards and entropy
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 12), sharex=True)
-
-        # Plot rewards
-        ax1.plot(self.timesteps, self.rewards, label='Episode Reward', alpha=0.5)
-        
-        # Plot the moving average of rewards
-        if len(self.rewards) >= self.moving_avg_window:
-            moving_avg = np.convolve(self.rewards, np.ones(self.moving_avg_window), 'valid') / self.moving_avg_window
-            ax1.plot(self.timesteps[self.moving_avg_window-1:], moving_avg, 
-                     label=f'{self.moving_avg_window}-episode Moving Average')
-        
-        ax1.set_ylabel('Rewards')
-        ax1.set_title('Training Progress')
-        ax1.legend()
-        ax1.grid(True)
-
-        # Plot entropy
-        ax2.plot(self.timesteps, self.entropies, label='Policy Entropy', color='g')
-        ax2.set_xlabel('Timesteps')
-        ax2.set_ylabel('Entropy')
-        ax2.set_title('Policy Entropy Over Time')
-        ax2.legend()
-        ax2.grid(True)
-
-        plt.tight_layout()
-        plt.savefig(f"{self.log_dir}/training_progress_metrics.png")
+    def _plot_metric(self, data, metric, color, agent):
+        plt.figure(figsize=(10, 5))
+        plt.plot(data['t'], data[f'{agent}_{metric}'], color=color)
+        plt.title(f'{agent.capitalize()} {metric.capitalize()} over time')
+        plt.xlabel('Timesteps')
+        plt.ylabel(f'{agent.capitalize()} {metric.capitalize()}')
+        plt.savefig(f'{self.log_dir}/{agent}_{metric}_plot.png')
         plt.close()
 
-        if self.verbose > 0:
-            print(f"Training progress plot saved to {self.log_dir}/training_progress_metrics.png")
-            print(f"Final reward: {self.rewards[-1]:.2f}")
-            print(f"Final policy entropy: {self.entropies[-1]:.4f}")
+    def on_training_end(self):
+        # Load the CSV file
+        df = pd.read_csv(f'{self.log_dir}/monitor.csv', skiprows=1)  # Skip the first row which contains metadata
 
-        # New: Plot info data
-        for key, values in self.info_history.items():
-            plt.figure(figsize=(12, 6))
-            plt.plot(self.timesteps[:len(values)], values, label=key)
+        agents = ['agent_0', 'agent_1']
+        metrics = ['r', 'arousal', 'satiety', 'social_touch']
+        colors = {'r': 'b', 'arousal': 'r', 'satiety': 'g', 'social_touch': 'purple'}
+
+        for agent in agents:
+            # Plot individual metrics for each agent
+            for metric in metrics:
+                self._plot_metric(df, metric, colors[metric], agent)
+
+            # Create a combined plot for each agent
+            plt.figure(figsize=(12, 8))
+            for metric in metrics:
+                plt.plot(df['t'], df[f'{agent}_{metric}'], label=metric.capitalize(), color=colors[metric])
+            plt.title(f'{agent.capitalize()} Metrics over time')
             plt.xlabel('Timesteps')
-            plt.ylabel(key)
-            plt.title(f'{key} Over Time')
+            plt.ylabel('Value')
             plt.legend()
-            plt.grid(True)
-            plt.savefig(f"{self.log_dir}/{key}_over_time.png")
+            plt.savefig(f'{self.log_dir}/{agent}_combined_metrics_plot.png')
             plt.close()
 
-        if self.verbose > 0:
-            print(f"Training progress plots saved to {self.log_dir}/")
-            print(f"Final reward: {self.rewards[-1]:.2f}")
-            print(f"Final policy entropy: {self.entropies[-1]:.4f}")
+        # Create a combined plot for both agents
+        plt.figure(figsize=(15, 10))
+        for agent in agents:
+            for metric in metrics:
+                plt.plot(df['t'], df[f'{agent}_{metric}'], label=f'{agent} {metric}', alpha=0.7)
+        plt.title('All Metrics for Both Agents over time')
+        plt.xlabel('Timesteps')
+        plt.ylabel('Value')
+        plt.legend()
+        plt.savefig(f'{self.log_dir}/all_agents_combined_metrics_plot.png')
+        plt.close()
 
-        # Save metrics to CSV
-        import pandas as pd
-        df = pd.DataFrame({
-            'timestep': self.timesteps,
-            'reward': self.rewards,
-            'entropy': self.entropies,
-            **{key: values for key, values in self.info_history.items()}
-        })
-        df.to_csv(f"{self.log_dir}/training_metrics.csv", index=False)
+        print(f"Plots saved in {self.log_dir}")
 
-class RecordObservationsCallback(BaseCallback):
-    def __init__(self, verbose=0):
-            super(RecordObservationsCallback, self).__init__(verbose)
-            self.arousal_history = []
-            self.satiety_history = []
-            self.rewards_history = []
-            self.timesteps = []
+class MultiAgentMonitor(Monitor):
+    def __init__(self, env, filename, info_keywords=()):
+        super().__init__(env, filename, info_keywords=info_keywords)
+        # Instead of using env.agents, we'll determine the number of agents from the action space
+        self.num_agents = env.action_space.shape[0]  # Assuming the action space is structured for multiple agents
 
-    def _on_step(self) -> bool:
-            # Access the base environments
-            base_envs = self.training_env.venv.envs[0]
-
-            arousal_values = []
-            satiety_values = []
-
-            for env in base_envs:
-                # Check if the base environment has the get_agent_states method
-                if hasattr(base_envs, 'get_agent_states'):
-                    agent_states = base_envs.get_agent_states()
-                    
-                    # Extract arousal and satiety from the agent states
-                    for agent_state in agent_states.values():
-                        arousal_values.append(agent_state.get('arousal', 0))
-                        satiety_values.append(agent_state.get('satiety', 0))
-                if base_envs.agent_states != None:
-                    agent_states = base_envs.agent_states
-                    
-                    # Extract arousal and satiety from the agent states
-                    for agent_state in agent_states.values():
-                        arousal_values.append(agent_state.get('arousal', 0))
-                        satiety_values.append(agent_state.get('satiety', 0)) 
-                else:
-                    print("Warning: get_agent_states method not found in the environment")
-            
-            # Record the mean values
-            if arousal_values:
-                self.arousal_history.append(np.mean(arousal_values))
-            if satiety_values:
-                self.satiety_history.append(np.mean(satiety_values))
-            
-            # Record the mean reward
-            self.rewards_history.append(np.mean(self.locals['rewards']))
-            
-            # Record the timestep
-            self.timesteps.append(self.num_timesteps)
-
-            return True
-
-    def on_training_end(self) -> None:
-            # Create a DataFrame with the recorded data
-            df = pd.DataFrame({
-                'timestep': self.timesteps,
-                'mean_arousal': self.arousal_history,
-                'mean_satiety': self.satiety_history,
-                'mean_reward': self.rewards_history
-            })
-
-            # Save the DataFrame to a CSV file
-            os.makedirs('training_logs', exist_ok=True)
-            df.to_csv('training_logs/training_observations.csv', index=False)
-            print("Training observations saved to training_logs/training_observations.csv")
-
+    def step(self, action):
+        observation, reward, done, info = self.env.step(action)
+        self.rewards.append(sum(reward))  # Sum rewards across all agents
+        if done.all():  # Assuming done is a boolean array for all agents
+            ep_rew = sum(self.rewards)
+            ep_len = len(self.rewards)
+            ep_info = {"r": ep_rew, "l": ep_len, "t": round(time.time() - self.t_start, 6)}
+            for i in range(self.num_agents):
+                for k in self.info_keywords:
+                    ep_info[f"agent_{i}_{k}"] = info[k][i]  # Assuming info is structured as {key: [agent1_value, agent2_value, ...]}
+            self.episode_returns.append(ep_rew)
+            self.episode_lengths.append(ep_len)
+            self.episode_times.append(time.time() - self.t_start)
+            ep_info.update(self.current_reset_info)
+            if self.results_writer:
+                self.results_writer.write_row(ep_info)
+            self.reset_info()
+            self.rewards = []
+        return observation, reward, done, info
+    
 
 def plot_results(log_folder, title="Learning Curve"):
     episode_rewards = np.load(os.path.join(log_folder, "episode_rewards.npy"))
@@ -267,23 +255,30 @@ def train_butterfly_supersuit(
         env = ss.concat_vec_envs_v1(env, num_envs, num_cpus=2, base_class="stable_baselines3")
         return env
 
+    def create_env_multiMonitor(num_envs=8, log_dir="./logs", for_eval=False):
+        env_counter = 0
+        def make_env():
+            nonlocal env_counter
+            env = env_fn.parallel_env(**env_kwargs)
+            env.reset(seed=seed + (1000 if for_eval else 0))
+            env = ss.pettingzoo_env_to_vec_env_v1(env)
+            # Use the custom MultiAgentMonitor with a counter for unique env ids
+            env = MultiAgentMonitor(env, f"{log_dir}/env_{env_counter}", info_keywords=('arousal', 'satiety', 'social_touch'))
+            env_counter += 1
+            return env
+
+        return DummyVecEnv([make_env for _ in range(num_envs)])
     
-    # Create training environment
-    train_env = create_env(num_envs=8)
-    
-
-    print(f"Starting training on {str(train_env.unwrapped.metadata['name'])}.")
-
-    # Create evaluation environment
-    eval_env = create_env(num_envs=1, for_eval=True)
-
     # Set up logging directory
     timestamp = time.strftime('%Y%m%d-%H%M%S')
-    log_dir = f"./logs/{train_env.unwrapped.metadata.get('name')}_{timestamp}"
+    log_dir = f"./logs/{env_fn.__name__}_{time.strftime('%Y%m%d-%H%M%S')}"
     os.makedirs(log_dir, exist_ok=True)
+
+    # Create training environment
+    env = create_env(num_envs=8)
     
     # Wrap the vectorized environment with VecMonitor
-    env = VecMonitor(train_env, log_dir, info_keywords = ['arousal', 'satiety', 'social_touch'])
+    #env = VecMonitor(train_env, log_dir, info_keywords = ['arousal', 'satiety', 'social_touch'])
 
     print(f"Starting training on {str(env.unwrapped.metadata['name'])}.")
 
