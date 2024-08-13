@@ -437,9 +437,9 @@ class WaterworldBase:
         # Store initial arousal and satiety
         for i, pursuer in enumerate(self.pursuers):
             self.agent_states[f"pursuer_{i}"] = {
-                "arousal": pursuer.arousal,
-                "satiety": pursuer.satiety,
-                "social_touch" : 0
+                "arousal": f"pursuer_{i}_{pursuer.arousal}",
+                "satiety": f"pursuer_{i}_{pursuer.satiety}",
+                "social-touch" : f"pursuer_{i}_0",
             }
 
         return obs_list[0]
@@ -576,7 +576,7 @@ class WaterworldBase:
                 self.agent_states[f"pursuer_{i}"] = {
                     "arousal": f"pursuer_{i}_{pursuer.arousal}",
                     "satiety": f"pursuer_{i}_{pursuer.satiety}",
-                    "social_touch" : f"pursuer_{i}_{pursuer.social_haptic_modulation}"
+                    "social-touch" : f"pursuer_{i}_{pursuer.social_haptic_modulation}"
                 }
 
             
