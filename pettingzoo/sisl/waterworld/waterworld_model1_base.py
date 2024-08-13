@@ -132,6 +132,7 @@ class WaterworldBase:
         self.get_spaces()
         self._seed()
 
+
     @property
     def unwrapped(self):
         return self
@@ -437,7 +438,8 @@ class WaterworldBase:
         for i, pursuer in enumerate(self.pursuers):
             self.agent_states[f"pursuer_{i}"] = {
                 "arousal": pursuer.arousal,
-                "satiety": pursuer.satiety
+                "satiety": pursuer.satiety,
+                "social_touch" : 0
             }
 
         return obs_list[0]
@@ -572,11 +574,12 @@ class WaterworldBase:
             # Store arousal and satiety
             for i, pursuer in enumerate(self.pursuers):
                 self.agent_states[f"pursuer_{i}"] = {
-                    "arousal": pursuer.arousal,
-                    "satiety": pursuer.satiety,
-                    "social_touch" : pursuer.social_haptic_modulation
+                    "arousal": f"pursuer_{i}_{pursuer.arousal}",
+                    "satiety": f"pursuer_{i}_{pursuer.satiety}",
+                    "social_touch" : f"pursuer_{i}_{pursuer.social_haptic_modulation}"
                 }
 
+            
             # Update frames
             self.frames += 1
 

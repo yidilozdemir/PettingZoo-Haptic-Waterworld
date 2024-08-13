@@ -128,7 +128,8 @@ class Pursuers(MovingObject):
         self.arousal_decay_rate = arousal_decay_rate
         self.haptic_modulation_type = haptic_modulation_type
         self.satiety_arousal_rate = satiety_arousal_rate
-
+        self.social_haptic_modulation = 0
+        
         self.shape.food_indicator = 0  # 1 if food caught at this step, 0 otherwise
         self.shape.food_touched_indicator = (
             0  # 1 if food touched as this step, 0 otherwise

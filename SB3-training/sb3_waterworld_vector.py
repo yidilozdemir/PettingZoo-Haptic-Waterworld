@@ -64,70 +64,6 @@ def plot_results_custom(log_folder, title="Learning Curve"):
         plt.title(title + " Smoothed")
         plt.show()
 
-class PlottingCallbackMetrics_MultiAgentMonitor(BaseCallback):
-    def __init__(self, log_dir, verbose=1):
-        super(PlottingCallbackMetrics, self).__init__(verbose)
-        self.log_dir = log_dir
-
-    def _on_step(self) -> bool:
-        return True
-
-    def _plot_metric(self, data, metric, agent):
-        plt.figure(figsize=(10, 5))
-        plt.plot(data['t'], data[f'{agent}_{metric}'])
-        plt.title(f'{agent} {metric} over time')
-        plt.xlabel('Timesteps')
-        plt.ylabel(metric.capitalize())
-        plt.savefig(f'{self.log_dir}/{agent}_{metric}_plot.png')
-        plt.close()
-
-    def on_training_end(self):
-        # Load the CSV file
-        df = pd.read_csv(f'{self.log_dir}/monitor.csv', skiprows=1)  # Skip the first row which contains metadata
-
-        agents = ['agent_0', 'agent_1']  # Adjust if you have different agent names
-        metrics = ['arousal', 'satiety', 'social_touch']
-
-        # Plot individual metrics for each agent
-        for agent in agents:
-            for metric in metrics:
-                self._plot_metric(df, metric, agent)
-
-            # Plot combined metrics for each agent
-            plt.figure(figsize=(12, 6))
-            for metric in metrics:
-                plt.plot(df['t'], df[f'{agent}_{metric}'], label=metric)
-            plt.title(f'{agent} metrics over time')
-            plt.xlabel('Timesteps')
-            plt.ylabel('Value')
-            plt.legend()
-            plt.savefig(f'{self.log_dir}/{agent}_combined_metrics.png')
-            plt.close()
-
-        # Plot reward (which is common for both agents)
-        plt.figure(figsize=(10, 5))
-        plt.plot(df['t'], df['r'])
-        plt.title('Reward over time')
-        plt.xlabel('Timesteps')
-        plt.ylabel('Reward')
-        plt.savefig(f'{self.log_dir}/reward_plot.png')
-        plt.close()
-
-        # Plot all metrics for both agents in one graph
-        plt.figure(figsize=(15, 8))
-        for agent in agents:
-            for metric in metrics:
-                plt.plot(df['t'], df[f'{agent}_{metric}'], label=f'{agent} {metric}')
-        plt.plot(df['t'], df['r'], label='Reward', linewidth=2)
-        plt.title('All metrics over time')
-        plt.xlabel('Timesteps')
-        plt.ylabel('Value')
-        plt.legend()
-        plt.savefig(f'{self.log_dir}/all_metrics_plot.png')
-        plt.close()
-
-        print(f"Plots saved in {self.log_dir}")
-    
 class PlottingCallbackMetrics(BaseCallback):
     def __init__(self, log_dir, verbose=1):
         super(PlottingCallbackMetrics, self).__init__(verbose)
@@ -136,79 +72,68 @@ class PlottingCallbackMetrics(BaseCallback):
     def _on_step(self) -> bool:
         return True
 
-    def _plot_metric(self, data, metric, color, agent):
+    def _parse_data(self, df):
+        parsed_data = {'r': df['r'], 'l': df['l'], 't': df['t']}
+        metrics = ['arousal', 'satiety', 'social_touch']
+        
+        for metric in metrics:
+            if metric in df.columns:
+                pursuer_data = df[metric].str.split('_', expand=True)
+                for i in range(1, pursuer_data.shape[1], 2):  # Skip 'pursuer' columns
+                    pursuer_id = pursuer_data[i]
+                    value = pursuer_data[i+1].astype(float)
+                    parsed_data[f'{metric}_pursuer_{pursuer_id[0]}'] = value
+        
+        return pd.DataFrame(parsed_data)
+
+    def _plot_metric(self, data, metric, color):
         plt.figure(figsize=(10, 5))
-        plt.plot(data['t'], data[f'{agent}_{metric}'], color=color)
-        plt.title(f'{agent.capitalize()} {metric.capitalize()} over time')
+        plt.plot(data['t'], data[metric], color=color)
+        plt.title(f'{metric.capitalize()} over time')
         plt.xlabel('Timesteps')
-        plt.ylabel(f'{agent.capitalize()} {metric.capitalize()}')
-        plt.savefig(f'{self.log_dir}/{agent}_{metric}_plot.png')
+        plt.ylabel(metric.capitalize())
+        plt.savefig(f'{self.log_dir}/{metric}_plot.png')
         plt.close()
 
     def on_training_end(self):
         # Load the CSV file
         df = pd.read_csv(f'{self.log_dir}/monitor.csv', skiprows=1)  # Skip the first row which contains metadata
-
-        agents = ['agent_0', 'agent_1']
-        metrics = ['r', 'arousal', 'satiety', 'social_touch']
-        colors = {'r': 'b', 'arousal': 'r', 'satiety': 'g', 'social_touch': 'purple'}
-
-        for agent in agents:
-            # Plot individual metrics for each agent
-            for metric in metrics:
-                self._plot_metric(df, metric, colors[metric], agent)
-
-            # Create a combined plot for each agent
-            plt.figure(figsize=(12, 8))
-            for metric in metrics:
-                plt.plot(df['t'], df[f'{agent}_{metric}'], label=metric.capitalize(), color=colors[metric])
-            plt.title(f'{agent.capitalize()} Metrics over time')
-            plt.xlabel('Timesteps')
-            plt.ylabel('Value')
-            plt.legend()
-            plt.savefig(f'{self.log_dir}/{agent}_combined_metrics_plot.png')
-            plt.close()
-
-        # Create a combined plot for both agents
+        
+        # Parse the data
+        parsed_df = self._parse_data(df)
+        
+        # Plot standard metrics
+        self._plot_metric(parsed_df, 'r', 'b')
+        self._plot_metric(parsed_df, 'l', 'g')
+        
+        # Plot pursuer-specific metrics
+        metrics = ['arousal', 'satiety', 'social_touch']
+        colors = {'arousal': 'r', 'satiety': 'purple', 'social_touch': 'orange'}
+        
+        for column in parsed_df.columns:
+            if any(metric in column for metric in metrics):
+                self._plot_metric(parsed_df, column, colors[column.split('_')[0]])
+        
+        # Create a combined plot
         plt.figure(figsize=(15, 10))
-        for agent in agents:
-            for metric in metrics:
-                plt.plot(df['t'], df[f'{agent}_{metric}'], label=f'{agent} {metric}', alpha=0.7)
-        plt.title('All Metrics for Both Agents over time')
+        plt.plot(parsed_df['t'], parsed_df['r'], label='Reward', color='b')
+        plt.plot(parsed_df['t'], parsed_df['l'], label='Episode Length', color='g')
+        
+        for column in parsed_df.columns:
+            if any(metric in column for metric in metrics):
+                plt.plot(parsed_df['t'], parsed_df[column], label=column, alpha=0.7)
+        
+        plt.title('All Metrics over time')
         plt.xlabel('Timesteps')
         plt.ylabel('Value')
         plt.legend()
-        plt.savefig(f'{self.log_dir}/all_agents_combined_metrics_plot.png')
+        plt.savefig(f'{self.log_dir}/combined_metrics_plot.png')
         plt.close()
-
-        print(f"Plots saved in {self.log_dir}")
-
-class MultiAgentMonitor(Monitor):
-    def __init__(self, env, filename, info_keywords=()):
-        super().__init__(env, filename, info_keywords=info_keywords)
-        # Instead of using env.agents, we'll determine the number of agents from the action space
-        self.num_agents = env.action_space.shape[0]  # Assuming the action space is structured for multiple agents
-
-    def step(self, action):
-        observation, reward, done, info = self.env.step(action)
-        self.rewards.append(sum(reward))  # Sum rewards across all agents
-        if done.all():  # Assuming done is a boolean array for all agents
-            ep_rew = sum(self.rewards)
-            ep_len = len(self.rewards)
-            ep_info = {"r": ep_rew, "l": ep_len, "t": round(time.time() - self.t_start, 6)}
-            for i in range(self.num_agents):
-                for k in self.info_keywords:
-                    ep_info[f"agent_{i}_{k}"] = info[k][i]  # Assuming info is structured as {key: [agent1_value, agent2_value, ...]}
-            self.episode_returns.append(ep_rew)
-            self.episode_lengths.append(ep_len)
-            self.episode_times.append(time.time() - self.t_start)
-            ep_info.update(self.current_reset_info)
-            if self.results_writer:
-                self.results_writer.write_row(ep_info)
-            self.reset_info()
-            self.rewards = []
-        return observation, reward, done, info
-    
+        
+        # Save parsed data to CSV
+        parsed_df.to_csv(f'{self.log_dir}/parsed_metrics.csv', index=False)
+        
+        print(f"Plots and parsed data saved in {self.log_dir}")
 
 def plot_results(log_folder, title="Learning Curve"):
     episode_rewards = np.load(os.path.join(log_folder, "episode_rewards.npy"))
@@ -248,26 +173,14 @@ def train_butterfly_supersuit(
     env_fn, steps: int = 10_000, seed: int | None = 0, **env_kwargs
 ):
 
+    n_pursuers = env_kwargs.get("n_pursuers", 1) 
+
     def create_env(num_envs=8, for_eval=False):
         env = env_fn.parallel_env(**env_kwargs)
         env.reset(seed= seed + (1000 if for_eval else 0))  # Different seed for eval
         env = ss.pettingzoo_env_to_vec_env_v1(env)
         env = ss.concat_vec_envs_v1(env, num_envs, num_cpus=2, base_class="stable_baselines3")
         return env
-
-    def create_env_multiMonitor(num_envs=8, log_dir="./logs", for_eval=False):
-        env_counter = 0
-        def make_env():
-            nonlocal env_counter
-            env = env_fn.parallel_env(**env_kwargs)
-            env.reset(seed=seed + (1000 if for_eval else 0))
-            env = ss.pettingzoo_env_to_vec_env_v1(env)
-            # Use the custom MultiAgentMonitor with a counter for unique env ids
-            env = MultiAgentMonitor(env, f"{log_dir}/env_{env_counter}", info_keywords=('arousal', 'satiety', 'social_touch'))
-            env_counter += 1
-            return env
-
-        return DummyVecEnv([make_env for _ in range(num_envs)])
     
     # Set up logging directory
     timestamp = time.strftime('%Y%m%d-%H%M%S')
@@ -276,9 +189,13 @@ def train_butterfly_supersuit(
 
     # Create training environment
     env = create_env(num_envs=8)
-    
+
+    # Metrics to track we are interested in 
+    info_keywords = ['arousal', 'satiety', 'social_touch']
+    #info_keywords = [f"pursuer_{i}_{metric}" for i in range(n_pursuers) for metric in base_metrics]
+
     # Wrap the vectorized environment with VecMonitor
-    #env = VecMonitor(train_env, log_dir, info_keywords = ['arousal', 'satiety', 'social_touch'])
+    env = VecMonitor(env, log_dir, info_keywords)
 
     print(f"Starting training on {str(env.unwrapped.metadata['name'])}.")
 
@@ -579,7 +496,7 @@ def call_eval(n_evaluations = 5):
 
 if __name__ == "__main__":
     env_fn = waterworld_model1
-    env_kwargs = {}
+    env_kwargs = {"n_pursuers" : 2}
 
     # Train a model (takes ~3 minutes on GPU)
     #train_butterfly_supersuit(env_fn, steps=196_608, seed=0, **env_kwargs)
