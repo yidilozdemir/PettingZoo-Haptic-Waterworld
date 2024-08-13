@@ -13,7 +13,7 @@ import csv
 
 import supersuit as ss
 from stable_baselines3 import PPO
-from stable_baselines3.ppo import MlpPolicy
+from sb3_contrib import RecurrentPPO
 from scipy import stats
 
 import gymnasium as gym 
@@ -191,7 +191,7 @@ def train_butterfly_supersuit(
     env = create_env(num_envs=8)
 
     # Metrics to track we are interested in 
-    info_keywords = ['arousal', 'satiety', 'social_touch']
+    info_keywords = ['arousal', 'satiety', 'social-touch']
     #info_keywords = [f"pursuer_{i}_{metric}" for i in range(n_pursuers) for metric in base_metrics]
 
     # Wrap the vectorized environment with VecMonitor
@@ -224,7 +224,7 @@ def train_butterfly_supersuit(
         return func
 
 
-    total_timesteps = 500000  # 5 million timesteps
+    total_timesteps = 5000000  # 5 million timesteps
     eval_freq = 100_000  # Evaluate every 100,000 steps
 
     # Create the learning rate schedule
@@ -262,8 +262,10 @@ def train_butterfly_supersuit(
 
 
     # Create and train the model with the learning rate schedule
-    model = PPO("MlpPolicy", env, verbose=1, learning_rate=learning_rate)
+    model = RecurrentPPO("MlpLstmPolicy", env, verbose=1, learning_rate=learning_rate)
     model.learn(total_timesteps=total_timesteps, callback=callbacks)
+    model_save_path = os.path.join(log_dir, f"{env.unwrapped.metadata.get('name')}_{timestamp}.zip")
+    model.save(model_save_path)
 
     print("Model has been saved.")
     print(f"Finished training on {str(env.unwrapped.metadata['name'])}.")
@@ -289,12 +291,11 @@ def eval(env_fn, num_games: int = 100, render_mode: str | None = None, **env_kwa
     print(
         f"\nStarting evaluation on {env.unwrapped.metadata.get('name')} {os.path.getctime}  (num_games={num_games}, render_mode={render_mode})"
     )
+    env_name = env.metadata['name'] # Adjust this to match your folder naming convention
 
     try:
         # Look for the best model in the logs directory
-        latest_policy = max(
-            glob.glob(f"{env.metadata['name']}*.zip"), key=os.path.getctime
-        )
+        latest_policy = find_latest_policy(env_name)
 
         print(f"Loading policy from: {latest_policy}")
     except ValueError:
@@ -305,30 +306,73 @@ def eval(env_fn, num_games: int = 100, render_mode: str | None = None, **env_kwa
 
     print(f"Starting eval on {str(env.metadata['name'])}.")
     rewards = {agent: 0 for agent in env.possible_agents}
+    metrics = {agent: {'arousal': [], 'satiety': [], 'social_touch': []} for agent in env.possible_agents}
 
     # Note: We train using the Parallel API but evaluate using the AEC API
     # SB3 models are designed for single-agent settings, we get around this by using he same model for every agent
     for i in range(num_games):
         env.reset(seed=i)
         print(str(i) + " game")
+        episode_metrics = {agent: {'arousal': [], 'satiety': [], 'social_touch': []} for agent in env.possible_agents}
+
         for agent in env.agent_iter():
             obs, reward, termination, truncation, info = env.last()
 
             for a in env.agents:
                 rewards[a] += env.rewards[a]
                 print("reward for agent " + str(a) + " = " + str(rewards[a]))
+                # Parse and store metrics
+                for metric in ['arousal', 'satiety', 'social_touch']:
+                    if metric in info:
+                        value = float(info[metric].split('_')[-1])  # Extract the float value
+                        episode_metrics[a][metric].append(value)
+
             if termination or truncation:
                 break
             else:
                 act = model.predict(obs, deterministic=True)[0]
 
             env.step(act)
+            # Print and store episode metrics
+        for a in env.agents:
+            print(f"Agent {a}:")
+            print(f"  Reward: {rewards[a]}")
+            for metric in ['arousal', 'satiety', 'social_touch']:
+                avg_value = np.mean(episode_metrics[a][metric])
+                metrics[a][metric].append(avg_value)
+                print(f"  Average {metric}: {avg_value:.4f}")
+
     env.close()
 
-    avg_reward = sum(rewards.values()) / len(rewards.values())
-    print("Rewards: ", rewards)
-    print(f"Avg reward: {avg_reward}")
-    return avg_reward
+    # Print overall evaluation results
+    print("\nOverall Evaluation Results:")
+    for a in env.agents:
+        print(f"Agent {a}:")
+        print(f"  Total Reward: {rewards[a]}")
+        for metric in ['arousal', 'satiety', 'social_touch']:
+            avg_value = np.mean(metrics[a][metric])
+            std_value = np.std(metrics[a][metric])
+            print(f"  {metric.capitalize()}: Mean = {avg_value:.4f}, Std = {std_value:.4f}")
+
+    save_dir = os.path.dirname(latest_policy)
+    timestamp = os.path.getctime(latest_policy)
+    
+    # Save rewards
+    rewards_file = os.path.join(save_dir, f'eval_rewards_{timestamp}.json')
+    with open(rewards_file, 'w') as f:
+        json.dump(rewards, f, indent=4)
+    
+    # Save metrics
+    metrics_file = os.path.join(save_dir, f'eval_metrics_{timestamp}.csv')
+    with open(metrics_file, 'w', newline='') as f:
+        writer = csv.writer(f)
+        header = ['game'] + [f'{a}_{m}' for a in env.agents for m in ['arousal', 'satiety', 'social_touch']]
+        writer.writerow(header)
+        for i in range(num_games):
+            row = [i+1] + [metrics[a][m][i] for a in env.agents for m in ['arousal', 'satiety', 'social_touch']]
+            writer.writerow(row)
+
+    return rewards, metrics
 
 def find_latest_policy(env_name, base_dir="."):
     log_dir = os.path.join(base_dir, "logs")
@@ -503,14 +547,9 @@ if __name__ == "__main__":
 
     # Evaluate 10 games (average reward should be positive but can vary significantly)
     log_dir = train_butterfly_supersuit(env_fn, steps=196_608, seed=0, **env_kwargs)
-    
-    # Plot the results
-    from stable_baselines3.common import results_plotter
-    results_plotter.plot_results(
-        [log_dir], 196_608, results_plotter.X_TIMESTEPS, "PPO Waterworld"
-    )
 
-    # Watch 2 games    #eval(env_fn, num_games=10, render_mode=None, **env_kwargs)
+    # Watch 2 games    #
+    eval(env_fn, num_games=10, render_mode=None, **env_kwargs)
     #call_eval()
     #plot_results_custom(log_dir)
     
