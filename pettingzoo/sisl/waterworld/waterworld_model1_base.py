@@ -49,6 +49,7 @@ class WaterworldBase:
         arousal_penalty_factor=2.0,
         haptic_modulation_type="average",
         satiety_arousal_rate=0,
+        haptic_weight=0.5
     ):
         """Input keyword arguments.
 
@@ -72,6 +73,8 @@ class WaterworldBase:
         thrust_penalty: scaling factor for the negative reard used to penalize large actions
         local_ratio: proportion of reward allocated locally vs distributed globally among all agents
         speed_features: whether to include entity speed in the state space
+        
+        haptic_weight:how much haptic modulation to allow, refer to update_awareness in Pursuers to see how formula works
         """
         self.pixel_scale = 30 * 25
         self.clock = pygame.time.Clock()
@@ -101,6 +104,7 @@ class WaterworldBase:
         self.arousal_penalty_factor = arousal_penalty_factor
         self.haptic_modulation_type = haptic_modulation_type
         self.satiety_arousal_rate = satiety_arousal_rate
+        self.haptic_weight = haptic_weight
 
         self.encounter_reward = encounter_reward
         self.food_reward = food_reward
@@ -186,7 +190,8 @@ class WaterworldBase:
                     sensor_range=self.sensor_range,
                     speed_features=self.speed_features,
                     haptic_modulation_type=self.haptic_modulation_type,
-                    satiety_arousal_rate=self.satiety_arousal_rate
+                    satiety_arousal_rate=self.satiety_arousal_rate,
+                    haptic_weight=self.haptic_weight
                 )
             )
 
@@ -565,6 +570,7 @@ class WaterworldBase:
             for pursuer in self.pursuers:
                 pursuer.shape.food_indicator = 0
                 pursuer.shape.poison_indicator = 0
+                pursuer.shape.social_touch_indicator = 0 
 
             # Remove eaten evaders and spawn new ones
             self.evaders = [evader for evader in self.evaders if not evader.eaten]

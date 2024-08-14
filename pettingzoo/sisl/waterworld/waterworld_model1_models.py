@@ -108,7 +108,8 @@ class Pursuers(MovingObject):
         satiety_decay_rate=0.01,
         arousal_decay_rate=0.005,
         haptic_modulation_type="average",
-        satiety_arousal_rate=0
+        satiety_arousal_rate=0,
+        haptic_weight=0.5
     ):  
         super().__init__(x, y, radius=radius)
 
@@ -129,6 +130,7 @@ class Pursuers(MovingObject):
         self.haptic_modulation_type = haptic_modulation_type
         self.satiety_arousal_rate = satiety_arousal_rate
         self.social_haptic_modulation = 0
+        self.haptic_weight = haptic_weight
         
         self.shape.food_indicator = 0  # 1 if food caught at this step, 0 otherwise
         self.shape.food_touched_indicator = (
@@ -159,6 +161,7 @@ class Pursuers(MovingObject):
     def update_awareness(self, dt, other_pursuers, evaders):
 
         # Calculate arousal based on nearby pursuers and social haptic modulation due to these contacts
+        #first initialise social haptic modulation value as 0
         self.social_haptic_modulation = 0
         pursuers_in_contact = [self]
         total_arousal = self.arousal
@@ -179,14 +182,12 @@ class Pursuers(MovingObject):
         if len(pursuers_in_contact) > 1:
             if self.haptic_modulation_type == "average":
                 average_arousal = total_arousal / len(pursuers_in_contact)
-                self.social_haptic_modulation = (average_arousal - self.arousal) * 0.1
+                self.social_haptic_modulation = (average_arousal - self.arousal) * self.haptic_weight
             elif self.haptic_modulation_type == "cooperative":
-                self.social_haptic_modulation = (max_arousal - self.arousal) * 0.1
+                self.social_haptic_modulation = (max_arousal - self.arousal) * self.haptic_weight
             elif self.haptic_modulation_type == "competitive":
-                self.social_haptic_modulation = (min_arousal - self.arousal) * 0.1
+                self.social_haptic_modulation = (min_arousal - self.arousal) * self.haptic_weight
             elif self.haptic_modulation_type == "no_effect":
-                self.social_haptic_modulation = (min_arousal - self.arousal) * 0.1
-            else:
                 self.social_haptic_modulation = 0
         else:
             self.social_haptic_modulation = 0
