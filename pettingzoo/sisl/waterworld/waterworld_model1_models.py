@@ -184,18 +184,16 @@ class Pursuers(MovingObject):
                 self.social_haptic_modulation = (max_arousal - self.arousal) * 0.1
             elif self.haptic_modulation_type == "competitive":
                 self.social_haptic_modulation = (min_arousal - self.arousal) * 0.1
+            elif self.haptic_modulation_type == "no_effect":
+                self.social_haptic_modulation = (min_arousal - self.arousal) * 0.1
             else:
                 self.social_haptic_modulation = 0
         else:
             self.social_haptic_modulation = 0
 
 
-        # Update food awareness
-        awareness_range = self.sensor_range * (1 + self.arousal)
-        self.food_awareness = [
-            evader for evader in evaders
-            if self.distance_to(evader) < awareness_range and not evader.eaten
-        ]
+        # Update sensor range
+        self.sensor_range = self.sensor_range * (1 + self.arousal)
 
         #Update arouusal influenced both by hunger and arousal modulation coming from haptic contact
         hunger = self.max_satiety - self.satiety
