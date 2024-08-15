@@ -104,7 +104,7 @@ class Pursuers(MovingObject):
         speed_features=True,
         max_satiety = 1.5,
         initial_satiety=0.5,
-        initial_arousal=0.0,
+        initial_arousal=0.5,
         satiety_decay_rate=0.01,
         arousal_decay_rate=0.005,
         haptic_modulation_type="average",
@@ -193,9 +193,6 @@ class Pursuers(MovingObject):
             self.social_haptic_modulation = 0
 
 
-        # Update sensor range
-        self.sensor_range = self.sensor_range * (1 + self.arousal)
-
         #Update arouusal influenced both by hunger and arousal modulation coming from haptic contact
         hunger = self.max_satiety - self.satiety
         self.arousal += hunger * 0.01 * dt + self.social_haptic_modulation
@@ -213,6 +210,9 @@ class Pursuers(MovingObject):
         
         #clip to be in certain range
         self.arousal = np.clip(self.arousal, -1, 1)
+
+        # Update sensor range
+        self.sensor_range = self.sensor_range * (1 + self.arousal)
 
     def distance_to(self, other):
         return np.linalg.norm(np.array(self.body.position) - np.array(other.body.position))
