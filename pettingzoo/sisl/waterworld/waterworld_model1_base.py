@@ -520,13 +520,14 @@ class WaterworldBase:
         self.control_rewards[agent_id] += accel_penalty * self.local_ratio
 
         if is_last:
-            # Update all pursuers
-            for pursuer in self.pursuers:
-                pursuer.update_awareness(1 / self.FPS, self.pursuers, self.evaders)
-
+            
             self.space.step(1 / self.FPS)
             obs_list = self.observe_list()
             self.last_obs = obs_list
+
+            # Update all pursuers
+            for pursuer in self.pursuers:
+                pursuer.update_awareness(1 / self.FPS, self.pursuers, self.evaders)
 
             # Reset behavior rewards
             self.behavior_rewards = [0 for _ in range(self.n_pursuers)]
