@@ -16,7 +16,7 @@
 #$ -N python-analysis-example
 
 # Request 1 cores.
-#$ -pe smp 
+#$ -pe smp 1
 
 # Set the working directory to project directory in your scratch space.
 # Replace "<your_UCL_id>" with your UCL user ID
