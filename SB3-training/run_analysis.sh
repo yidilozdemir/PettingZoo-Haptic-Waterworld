@@ -16,11 +16,11 @@
 #$ -N python-analysis-example
 
 # Request 1 cores.
-#$ -pe smp 1
+#$ -pe smp 
 
 # Set the working directory to project directory in your scratch space.
 # Replace "<your_UCL_id>" with your UCL user ID
-#$ -wd /home/<your_UCL_id>/Scratch/myriad-python-analysis-example
+$ -wd /home/zcbtyio/Scratch/PettingZoo-Haptic-Waterworld/SB3-training
 
 # Load python3 module - this must be the same version as loaded when creating and
 # installing dependencies in the virtual environment
@@ -31,12 +31,6 @@ PROJECT_DIR=/home/zcbtyio/Scratch/PettingZoo-Haptic-Waterworld/SB3-training
 
 # Activate the virtual environment in which you installed the project dependencies
 source $PROJECT_DIR/venv/bin/activate
-
-# Change current working directory to temporary file system on node
-cd $TMPDIR
-
-# Make a directory save analysis script outputs to
-mkdir outputs
 
 # Run analysis script using Python in activated virtual environment passing in path to
 # directory containing input data and path to directory to write outputs to
