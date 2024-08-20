@@ -192,7 +192,7 @@ def train_butterfly_supersuit(
     env = create_env(num_envs=8)
 
     # Metrics to track we are interested in 
-    info_keywords = ['arousal', 'satiety', 'social-touch']
+    info_keywords = []
     #info_keywords = [f"pursuer_{i}_{metric}" for i in range(n_pursuers) for metric in base_metrics]
 
     # Wrap the vectorized environment with VecMonitor
@@ -227,20 +227,6 @@ def train_butterfly_supersuit(
 
     total_timesteps = 5000000  # 5 million timesteps
     eval_freq = 10000  # Evaluate every 100,000 steps
-
-    # Create metadata file
-    metadata = {
-        "policy_name": policy_name,
-        "total_timesteps": total_timesteps,
-        "eval_freq": eval_freq,
-        "n_pursuers": n_pursuers,
-        "haptic_modulation_type": haptic_modulation_type
-    }
-    
-    metadata_path = os.path.join(log_dir, "metadata.txt")
-    with open(metadata_path, "w") as f:
-        for key, value in metadata.items():
-            f.write(f"{key}: {value}\n")
 
     # Create the learning rate schedule
     learning_rate = linear_schedule(initial_value=3e-4, final_value=1e-5, total_timesteps=total_timesteps)
@@ -551,8 +537,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     policy_name = args.policy_name
     env_kwargs = {
-        "n_pursuers": args.n_pursuers,
-        "haptic_modulation_type": args.haptic_modulation_type
+        "n_pursuers": args.n_pursuers
     }
 
     # Train a model (takes ~3 minutes on GPU)
