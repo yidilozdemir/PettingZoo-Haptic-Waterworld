@@ -193,7 +193,7 @@ def train_butterfly_supersuit(
     env = create_env(num_envs=8)
 
     # Metrics to track we are interested in 
-    info_keywords = []
+    info_keywords = info_keywords = ['arousal', 'satiety', 'social-touch']
     #info_keywords = [f"pursuer_{i}_{metric}" for i in range(n_pursuers) for metric in base_metrics]
 
     # Wrap the vectorized environment with VecMonitor
