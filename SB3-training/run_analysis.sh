@@ -20,7 +20,7 @@
 
 # Set the working directory to project directory in your scratch space.
 # Replace "<your_UCL_id>" with your UCL user ID
-$ -wd /home/zcbtyio/Scratch/PettingZoo-Haptic-Waterworld/SB3-training
+#$ -wd /home/zcbtyio/Scratch/PettingZoo-Haptic-Waterworld/SB3-training
 
 # Load python3 module - this must be the same version as loaded when creating and
 # installing dependencies in the virtual environment
@@ -35,7 +35,7 @@ source $PROJECT_DIR/venv/bin/activate
 # Run analysis script using Python in activated virtual environment passing in path to
 # directory containing input data and path to directory to write outputs to
 echo "Running analysis script..."
-python $PROJECT_DIR/python sb3_waterworld_myriad.py --n_pursuers 2 --policy_name MlpPolicy 
+python $PROJECT_DIR/python sb3_waterworld_myriad.py --n_pursuers 2 --policy_name MlpLstmPolicy 
 echo "...done."
 
 # Copy script outputs back to scratch space under a job ID specific subdirectory
