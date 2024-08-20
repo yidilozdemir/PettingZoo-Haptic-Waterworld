@@ -14,11 +14,12 @@ import csv
 
 import supersuit as ss
 from stable_baselines3 import PPO
+from sb3_contrib import RecurrentPPO
 from scipy import stats
 
 import gymnasium as gym 
 
-from pettingzoo.sisl import waterworld_v4
+from pettingzoo.sisl import waterworld_model1
 
 import matplotlib.pyplot as plt
 from stable_baselines3.common.callbacks import BaseCallback
@@ -266,8 +267,8 @@ def train_butterfly_supersuit(
 
 
     # Create and train the model with the learning rate schedule
-    #model = RecurrentPPO("MlpLstmPolicy", env, verbose=1, learning_rate=learning_rate)
-    model = PPO(policy_name, env, verbose=1, learning_rate=learning_rate)
+    model = RecurrentPPO("MlpLstmPolicy", env, verbose=1, learning_rate=learning_rate)
+    #model = PPO(policy_name, env, verbose=1, learning_rate=learning_rate)
     model.learn(total_timesteps=total_timesteps, callback=callbacks)
     model_save_path = os.path.join(log_dir, f"{env.unwrapped.metadata.get('name')}_{timestamp}.zip")
     model.save(model_save_path)
@@ -524,7 +525,7 @@ def call_eval(n_evaluations = 5):
 
 
 if __name__ == "__main__":
-    env_fn = waterworld_v4
+    env_fn = waterworld_model1
     #env_kwargs = {"n_pursuers" : 2, "haptic_modulation_type" : "no_effect" }
 
     parser = argparse.ArgumentParser(description="Train a butterfly supersuit model")

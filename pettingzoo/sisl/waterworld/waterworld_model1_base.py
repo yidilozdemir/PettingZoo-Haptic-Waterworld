@@ -49,7 +49,7 @@ class WaterworldBase:
         arousal_penalty_factor=2.0,
         haptic_modulation_type="average",
         satiety_arousal_rate=0,
-        haptic_weight=0.5
+        haptic_weight=0.8
     ):
         """Input keyword arguments.
 
