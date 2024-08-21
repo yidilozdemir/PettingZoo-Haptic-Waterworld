@@ -1,0 +1,13 @@
+policy_name: MlpLstmPolicy
+total_timesteps: 5000000
+eval_freq: 10000
+n_pursuers: 2
+haptic_modulation_type: average
+haptic_weight: 0.8
+
+Plots and parsed data saved in ./logs/average_pettingzoo.sisl.waterworld_model1_20240819-135152
+Model has been saved.
+Finished training on waterworld_model1.
+Model evaluate
+1591.2207
+1252.0853
