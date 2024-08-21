@@ -538,7 +538,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     policy_name = args.policy_name
     env_kwargs = {
-        "n_pursuers": args.n_pursuers
+        "n_pursuers": args.n_pursuers,
+        "haptic_modulation_type" : args.haptic_modulation_type
     }
 
     # Train a model (takes ~3 minutes on GPU)
