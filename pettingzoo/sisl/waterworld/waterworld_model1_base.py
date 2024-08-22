@@ -105,6 +105,7 @@ class WaterworldBase:
         self.haptic_modulation_type = haptic_modulation_type
         self.satiety_arousal_rate = satiety_arousal_rate
         self.haptic_weight = haptic_weight
+        print("haptic weight is " + str(haptic_weight))
 
         self.encounter_reward = encounter_reward
         self.food_reward = food_reward
