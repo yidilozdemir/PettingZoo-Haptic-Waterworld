@@ -35,7 +35,7 @@ source $PROJECT_DIR/pettingzoo-sb3/bin/activate
 # Run analysis script using Python in activated virtual environment passing in path to
 # directory containing input data and path to directory to write outputs to
 echo "Running analysis script..."
-python $PROJECT_DIR/sb3_waterworld_myriad.py --n_pursuers 2 --haptic_modulation_type average --haptic_weight 0.5 --policy_name MlpLstmPolicy 
+python $PROJECT_DIR/sb3_waterworld_vector.py --n_pursuers 2 --haptic_modulation_type average --haptic_weight 0.5 --policy_name MlpLstmPolicy 
 echo "...done."
 
 # Copy script outputs back to scratch space under a job ID specific subdirectory
