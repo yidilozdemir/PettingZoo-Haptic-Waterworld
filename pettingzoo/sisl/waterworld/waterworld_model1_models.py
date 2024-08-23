@@ -162,7 +162,6 @@ class Pursuers(MovingObject):
 
         # Calculate arousal based on nearby pursuers and social haptic modulation due to these contacts
         #first initialise social haptic modulation value as 0
-        self.social_haptic_modulation = 0
         pursuers_in_contact = [self]
         total_arousal = self.arousal
         max_arousal = self.arousal
