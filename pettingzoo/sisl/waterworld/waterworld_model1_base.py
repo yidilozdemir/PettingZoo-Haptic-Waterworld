@@ -445,7 +445,12 @@ class WaterworldBase:
             self.agent_states[f"pursuer_{i}"] = {
                 "arousal": f"pursuer_{i}_{pursuer.arousal}",
                 "satiety": f"pursuer_{i}_{pursuer.satiety}",
-                "social-touch" : f"pursuer_{i}_0",
+                "social-touch" : f"pursuer_{i}_initial",
+                "social-touch-modulation" : f"pursuer_{i}_initial",
+                "evader-eaten" : f"pursuer_{i}_initial",
+                "food_indicator": f"pursuer_{i}_initial",
+                "nutrition-per-pursuer": f"pursuer_{i}_initial",
+                "poison_indicator": f"pursuer_{i}_initial"
             }
 
         return obs_list[0]
@@ -533,6 +538,7 @@ class WaterworldBase:
             # Reset behavior rewards
             self.behavior_rewards = [0 for _ in range(self.n_pursuers)]
 
+            nutrition_per_pursuer = 0 
             for evader in self.evaders:
                 pursuers_eating = [
                     pursuer for pursuer in self.pursuers
@@ -568,26 +574,31 @@ class WaterworldBase:
             # Calculate final rewards
             self._calculate_rewards()
 
-            #Reset encounter indicators
-            for pursuer in self.pursuers:
-                pursuer.shape.food_indicator = 0
-                pursuer.shape.poison_indicator = 0
-                pursuer.shape.social_touch_indicator = 0 
-
+            # Store metrics to track for this episode
+            for i, pursuer in enumerate(self.pursuers):
+                self.agent_states[f"pursuer_{i}"] = {
+                    "arousal": f"pursuer_{i}_{pursuer.arousal}",
+                    "satiety": f"pursuer_{i}_{pursuer.satiety}",
+                    "social-touch" : f"pursuer_{i}_{pursuer.shape.social_touch_indicator}",
+                    "social-touch-modulation" : f"pursuer_{i}_{pursuer.social_haptic_modulation}",
+                    "evader-eaten" : f"pursuer_{i}_{evader.eaten}",
+                    "food_indicator": f"pursuer_{i}_{pursuer.shape.food_indicator}",
+                    "nutrition-per-pursuer": f"pursuer_{i}_{nutrition_per_pursuer}",
+                    "poison_indicator": f"pursuer_{i}_{pursuer.shape.poison_indicator}"
+                }
+            
             # Remove eaten evaders and spawn new ones
             self.evaders = [evader for evader in self.evaders if not evader.eaten]
             while len(self.evaders) < self.n_evaders:
                 self.evaders.append(self._spawn_evader())
 
-            # Store arousal and satiety
-            for i, pursuer in enumerate(self.pursuers):
-                self.agent_states[f"pursuer_{i}"] = {
-                    "arousal": f"pursuer_{i}_{pursuer.arousal}",
-                    "satiety": f"pursuer_{i}_{pursuer.satiety}",
-                    "social-touch" : f"pursuer_{i}_{pursuer.social_haptic_modulation}"
-                }
+            #Reset encounter indicators and haptic
+            for pursuer in self.pursuers:
+                pursuer.shape.food_indicator = 0
+                pursuer.shape.poison_indicator = 0
+                pursuer.shape.social_touch_indicator = 0 
+                pursuer.social_haptic_modulation = 0
 
-            
             # Update frames
             self.frames += 1
 
