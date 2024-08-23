@@ -5,6 +5,7 @@ For more information, see https://stable-baselines3.readthedocs.io/en/master/mod
 Author: Elliot (https://github.com/elliottower)
 """
 from __future__ import annotations
+import argparse
 
 import glob
 import os
@@ -25,7 +26,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.results_plotter import load_results, ts2xy
 from stable_baselines3.common.evaluation import evaluate_policy
 from pettingzoo.utils.conversions import aec_to_parallel
-from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnNoModelImprovement
+from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnNoModelImprovement, CheckpointCallback
 
 import numpy as np 
 import pandas as pd
@@ -74,7 +75,7 @@ class PlottingCallbackMetrics(BaseCallback):
 
     def _parse_data(self, df):
         parsed_data = {'r': df['r'], 'l': df['l'], 't': df['t']}
-        metrics = ['arousal', 'satiety', 'social_touch']
+        metrics = ['arousal', 'satiety', 'social-touch', 'social-touch-modulation', 'evader-eaten' ,'food_indicator', 'nutrition-per-pursuer', 'poison_indicator']
         
         for metric in metrics:
             if metric in df.columns:
@@ -107,8 +108,8 @@ class PlottingCallbackMetrics(BaseCallback):
         self._plot_metric(parsed_df, 'l', 'g')
         
         # Plot pursuer-specific metrics
-        metrics = ['arousal', 'satiety', 'social_touch']
-        colors = {'arousal': 'r', 'satiety': 'purple', 'social_touch': 'orange'}
+        metrics = ['arousal', 'satiety', 'social-touch']
+        colors = {'arousal': 'r', 'satiety': 'purple', 'social-touch': 'orange'}
         
         for column in parsed_df.columns:
             if any(metric in column for metric in metrics):
@@ -170,10 +171,12 @@ def plot_episode_rewards(ax, rewards, episode_num):
 
 
 def train_butterfly_supersuit(
-    env_fn, steps: int = 10_000, seed: int | None = 0, **env_kwargs
+    env_fn, policy_name, steps: int = 10_000, seed: int | None = 0, **env_kwargs,
 ):
 
     n_pursuers = env_kwargs.get("n_pursuers", 1) 
+    haptic_modulation_type = env_kwargs.get("haptic_modulation_type", 1) 
+    haptic_weight = env_kwargs.get("haptic_weight", 1) 
 
     def create_env(num_envs=8, for_eval=False):
         env = env_fn.parallel_env(**env_kwargs)
@@ -184,14 +187,14 @@ def train_butterfly_supersuit(
     
     # Set up logging directory
     timestamp = time.strftime('%Y%m%d-%H%M%S')
-    log_dir = f"./logs/{env_fn.__name__}_{time.strftime('%Y%m%d-%H%M%S')}"
+    log_dir = f"./logs/{haptic_modulation_type}_{env_fn.__name__}_{time.strftime('%Y%m%d-%H%M%S')}"
     os.makedirs(log_dir, exist_ok=True)
 
     # Create training environment
     env = create_env(num_envs=8)
 
     # Metrics to track we are interested in 
-    info_keywords = ['arousal', 'satiety', 'social-touch']
+    info_keywords = ['arousal', 'satiety', 'social-touch','social-touch-modulation', 'evader-eaten' ,'food_indicator', 'nutrition-per-pursuer', 'poison_indicator']
     #info_keywords = [f"pursuer_{i}_{metric}" for i in range(n_pursuers) for metric in base_metrics]
 
     # Wrap the vectorized environment with VecMonitor
@@ -225,7 +228,22 @@ def train_butterfly_supersuit(
 
 
     total_timesteps = 5000000  # 5 million timesteps
-    eval_freq = 100_000  # Evaluate every 100,000 steps
+    eval_freq = 10000  # Evaluate every 100,000 steps
+
+    # Create metadata file
+    metadata = {
+        "policy_name": policy_name,
+        "total_timesteps": total_timesteps,
+        "eval_freq": eval_freq,
+        "n_pursuers": n_pursuers,
+        "haptic_modulation_type": haptic_modulation_type,
+        "haptic_weight" : haptic_weight
+    }
+    
+    metadata_path = os.path.join(log_dir, "metadata.txt")
+    with open(metadata_path, "w") as f:
+        for key, value in metadata.items():
+            f.write(f"{key}: {value}\n")
 
     # Create the learning rate schedule
     learning_rate = linear_schedule(initial_value=3e-4, final_value=1e-5, total_timesteps=total_timesteps)
@@ -253,22 +271,37 @@ def train_butterfly_supersuit(
     eval_callback = EvalCallback(eval_env, callback_on_new_best=callback_on_best, eval_freq=eval_freq,
                                 best_model_save_path=log_dir, deterministic=True, render=False)
 
+    checkpoint_callback = CheckpointCallback(save_freq=10000, save_path=log_dir,
+                                         name_prefix='rl_model')
+    
     # Your plotting callback
     plotting_callback = PlottingCallbackMetrics(log_dir)
 
 
     # Combine all callbacks
-    callbacks = [eval_callback, plotting_callback]
+    callbacks = [eval_callback, plotting_callback, checkpoint_callback]
 
 
     # Create and train the model with the learning rate schedule
-    model = RecurrentPPO("MlpLstmPolicy", env, verbose=1, learning_rate=learning_rate)
+    #model = RecurrentPPO("MlpLstmPolicy", env, verbose=1, learning_rate=learning_rate)
+    model = RecurrentPPO(policy_name, env, verbose=1, learning_rate=learning_rate)
     model.learn(total_timesteps=total_timesteps, callback=callbacks)
     model_save_path = os.path.join(log_dir, f"{env.unwrapped.metadata.get('name')}_{timestamp}.zip")
     model.save(model_save_path)
 
     print("Model has been saved.")
     print(f"Finished training on {str(env.unwrapped.metadata['name'])}.")
+    vec_env = model.get_env()
+    print("Model evaluate")
+    mean_reward, std_reward = evaluate_policy(model, vec_env, n_eval_episodes=20, warn=False)
+    print(mean_reward)
+    print(std_reward)
+
+    
+    with open(metadata_path, "w") as f:
+        f.write(f"mean_reward: {mean_reward}\n")
+        f.write(f"std_reward: {std_reward}\n")
+
     env.close()
     eval_env.close()
 
@@ -287,11 +320,11 @@ def plot_with_confidence_interval(ax, data, label, color):
 def eval(env_fn, num_games: int = 100, render_mode: str | None = None, **env_kwargs):
     # Evaluate a trained agent vs a random agent
     env = env_fn.env(render_mode=render_mode, **env_kwargs)
-
+    
     print(
         f"\nStarting evaluation on {env.unwrapped.metadata.get('name')} {os.path.getctime}  (num_games={num_games}, render_mode={render_mode})"
     )
-    env_name = env.metadata['name'] # Adjust this to match your folder naming convention
+    env_name = "pettingzoo.sisl." + env.metadata['name'] # Adjust this to match your folder naming convention
 
     try:
         # Look for the best model in the logs directory
@@ -302,77 +335,52 @@ def eval(env_fn, num_games: int = 100, render_mode: str | None = None, **env_kwa
         print("Policy not found.")
         exit(0)
 
-    model = PPO.load(latest_policy)
+    
+
+    # Metrics to track we are interested in 
+    info_keywords = ['arousal', 'satiety', 'social-touch','social-touch-modulation', 'evader-eaten' ,'food_indicator', 'nutrition-per-pursuer', 'poison_indicator']
+    #info_keywords = [f"pursuer_{i}_{metric}" for i in range(n_pursuers) for metric in base_metrics]
+
+    # Wrap the vectorized environment with VecMonitor
+
+    model = RecurrentPPO.load(latest_policy)
 
     print(f"Starting eval on {str(env.metadata['name'])}.")
+
+    # Wrap the environment in a DummyVecEnv
+    #vec_env = DummyVecEnv([lambda: env])
+
     rewards = {agent: 0 for agent in env.possible_agents}
-    metrics = {agent: {'arousal': [], 'satiety': [], 'social_touch': []} for agent in env.possible_agents}
+    #metrics = {agent: {'arousal': [], 'satiety': [], 'social_touch': []} for agent in env.possible_agents}
+    obs = env.reset()
 
-    # Note: We train using the Parallel API but evaluate using the AEC API
-    # SB3 models are designed for single-agent settings, we get around this by using he same model for every agent
-    for i in range(num_games):
-        env.reset(seed=i)
-        print(str(i) + " game")
-        episode_metrics = {agent: {'arousal': [], 'satiety': [], 'social_touch': []} for agent in env.possible_agents}
+    # Cell and hidden state of the LSTM
+    lstm_states = None
+    num_envs = 1
+    # Episode start signals are used to reset the lstm states
+    episode_starts = np.ones((num_envs,), dtype=bool)
 
-        for agent in env.agent_iter():
-            obs, reward, termination, truncation, info = env.last()
-
-            for a in env.agents:
+    while True:
+        action, lstm_states = model.predict(obs, state=lstm_states, episode_start=episode_starts, deterministic=True)
+        # Note: vectorized environment resets automatically
+        obs, rewards, dones, info = env.step(action)
+        episode_starts = dones
+        for a in env.agents:
+                print(a)
+                print(env.rewards[a])
+                print(rewards)
                 rewards[a] += env.rewards[a]
                 print("reward for agent " + str(a) + " = " + str(rewards[a]))
-                # Parse and store metrics
-                for metric in ['arousal', 'satiety', 'social_touch']:
-                    if metric in info:
-                        value = float(info[metric].split('_')[-1])  # Extract the float value
-                        episode_metrics[a][metric].append(value)
-
-            if termination or truncation:
-                break
-            else:
-                act = model.predict(obs, deterministic=True)[0]
-
-            env.step(act)
-            # Print and store episode metrics
-        for a in env.agents:
-            print(f"Agent {a}:")
-            print(f"  Reward: {rewards[a]}")
-            for metric in ['arousal', 'satiety', 'social_touch']:
-                avg_value = np.mean(episode_metrics[a][metric])
-                metrics[a][metric].append(avg_value)
-                print(f"  Average {metric}: {avg_value:.4f}")
-
-    env.close()
-
-    # Print overall evaluation results
-    print("\nOverall Evaluation Results:")
-    for a in env.agents:
-        print(f"Agent {a}:")
-        print(f"  Total Reward: {rewards[a]}")
-        for metric in ['arousal', 'satiety', 'social_touch']:
-            avg_value = np.mean(metrics[a][metric])
-            std_value = np.std(metrics[a][metric])
-            print(f"  {metric.capitalize()}: Mean = {avg_value:.4f}, Std = {std_value:.4f}")
-
-    save_dir = os.path.dirname(latest_policy)
-    timestamp = os.path.getctime(latest_policy)
-    
-    # Save rewards
-    rewards_file = os.path.join(save_dir, f'eval_rewards_{timestamp}.json')
-    with open(rewards_file, 'w') as f:
-        json.dump(rewards, f, indent=4)
-    
-    # Save metrics
-    metrics_file = os.path.join(save_dir, f'eval_metrics_{timestamp}.csv')
-    with open(metrics_file, 'w', newline='') as f:
-        writer = csv.writer(f)
-        header = ['game'] + [f'{a}_{m}' for a in env.agents for m in ['arousal', 'satiety', 'social_touch']]
-        writer.writerow(header)
-        for i in range(num_games):
-            row = [i+1] + [metrics[a][m][i] for a in env.agents for m in ['arousal', 'satiety', 'social_touch']]
-            writer.writerow(row)
-
-    return rewards, metrics
+        env.render("human")        
+    # Print results
+    print("\nResults:")
+    for agent in env.possible_agents:
+        print(f"Agent {agent}:")
+        print(f" Total Reward: {rewards[agent]}")
+        #for metric in ['arousal', 'satiety', 'social_touch']:
+        #    if metrics[agent][metric]:
+        #        mean_value = np.mean(metrics[agent][metric])
+        #        print(f" Mean {metric}: {mean_value:.4f}")
 
 def find_latest_policy(env_name, base_dir="."):
     log_dir = os.path.join(base_dir, "logs")
@@ -540,16 +548,33 @@ def call_eval(n_evaluations = 5):
 
 if __name__ == "__main__":
     env_fn = waterworld_model1
-    env_kwargs = {"n_pursuers" : 2}
+    #env_kwargs = {"n_pursuers" : 2, "haptic_modulation_type" : "no_effect" }
+
+    parser = argparse.ArgumentParser(description="Train a butterfly supersuit model")
+    parser.add_argument('--n_pursuers', type=int, default=2, help='Number of pursuers')
+    parser.add_argument('--haptic_modulation_type', type=str, default='no_effect', help='Haptic modulation type')
+    parser.add_argument('--haptic_weight', type=float, default=0.5, help='Haptic weight')
+    parser.add_argument('--policy_name', type=str, default='MlpPolicy', help='PolicyName')
+    parser.add_argument('--steps', type=int, default=196_608, help='Number of training steps')
+    parser.add_argument('--seed', type=int, default=0, help='Random seed')
+    
+    args = parser.parse_args()
+
+    policy_name = args.policy_name
+    env_kwargs = {
+        "n_pursuers": args.n_pursuers,
+        "haptic_modulation_type": args.haptic_modulation_type,
+        "haptic_weight" : args.haptic_weight
+    }
 
     # Train a model (takes ~3 minutes on GPU)
     #train_butterfly_supersuit(env_fn, steps=196_608, seed=0, **env_kwargs)
 
     # Evaluate 10 games (average reward should be positive but can vary significantly)
-    log_dir = train_butterfly_supersuit(env_fn, steps=196_608, seed=0, **env_kwargs)
+    log_dir = train_butterfly_supersuit(env_fn, policy_name, steps=196_608, seed=0,  **env_kwargs)
 
     # Watch 2 games    #
-    eval(env_fn, num_games=10, render_mode=None, **env_kwargs)
+    #eval(env_fn, num_games=10, render_mode=None, **env_kwargs)
     #call_eval()
     #plot_results_custom(log_dir)
     
