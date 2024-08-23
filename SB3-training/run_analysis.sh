@@ -30,12 +30,12 @@ module load python3/3.9
 PROJECT_DIR=/home/zcbtyio/Scratch/PettingZoo-Haptic-Waterworld/SB3-training
 
 # Activate the virtual environment in which you installed the project dependencies
-source $PROJECT_DIR/venv/bin/activate
+source $PROJECT_DIR/pettingzoo-sb3/bin/activate
 
 # Run analysis script using Python in activated virtual environment passing in path to
 # directory containing input data and path to directory to write outputs to
 echo "Running analysis script..."
-python $PROJECT_DIR/sb3_waterworld_myriad.py --n_pursuers 2 --haptic_modulation_type average --policy_name MlpLstmPolicy >> show_output.txt
+python $PROJECT_DIR/sb3_waterworld_myriad.py --n_pursuers 2 --haptic_modulation_type average --haptic_weight 0.5 --policy_name MlpLstmPolicy 
 echo "...done."
 
 # Copy script outputs back to scratch space under a job ID specific subdirectory
