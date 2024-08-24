@@ -41,4 +41,5 @@ echo "...done."
 # Copy script outputs back to scratch space under a job ID specific subdirectory
 echo "Copying analysis outputs to scratch space..."
 rsync -a logs/ $PROJECT_DIR/outputs_$JOB_ID/
+cp output_average_haptic_weight0.5.txt $PROJECT_DIR/outputs_$JOB_ID/
 echo "...done"
