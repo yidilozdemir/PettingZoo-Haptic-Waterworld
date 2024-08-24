@@ -227,8 +227,8 @@ def train_butterfly_supersuit(
         return func
 
 
-    total_timesteps = 5000000  # 5 million timesteps
-    eval_freq = 10000  # Evaluate every 100,000 steps
+    total_timesteps = 10000000  # 5 million timesteps
+    eval_freq = 1000000  # Evaluate every 100,000 steps
 
     # Create metadata file
     metadata = {
@@ -271,7 +271,7 @@ def train_butterfly_supersuit(
     eval_callback = EvalCallback(eval_env, callback_on_new_best=callback_on_best, eval_freq=eval_freq,
                                 best_model_save_path=log_dir, deterministic=True, render=False)
 
-    checkpoint_callback = CheckpointCallback(save_freq=10000, save_path=log_dir,
+    checkpoint_callback = CheckpointCallback(save_freq=500000, save_path=log_dir,
                                          name_prefix='rl_model')
     
     # Your plotting callback
