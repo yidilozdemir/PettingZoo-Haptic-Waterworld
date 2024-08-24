@@ -1,6 +1,13 @@
 #!/bin/bash -l
 
+#$ -l tmpfs=15G
+
 # Example batch script to run a Python script in a virtual environment.
+#request 24 hours 
+#$ -l h_rt=24:00:00
+
+# For 2 GPUs
+#$ -l gpu=2
 
 # Set the name of the job.
 #$ -N pettingzoo
