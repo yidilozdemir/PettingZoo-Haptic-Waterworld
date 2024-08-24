@@ -2,9 +2,6 @@
 
 # Example batch script to run a Python script in a virtual environment.
 
-# Request 20 gigabyte of TMPDIR space (default is 10 GB)
-#$ -l tmpfs=20G
-
 # Set the name of the job.
 #$ -N pettingzoo
 
