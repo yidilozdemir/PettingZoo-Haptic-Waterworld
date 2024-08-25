@@ -96,45 +96,6 @@ class PlottingCallbackMetrics(BaseCallback):
         plt.savefig(f'{self.log_dir}/{metric}_plot.png')
         plt.close()
 
-    def on_training_end(self):
-        # Load the CSV file
-        df = pd.read_csv(f'{self.log_dir}/monitor.csv', skiprows=1)  # Skip the first row which contains metadata
-        
-        # Parse the data
-        parsed_df = self._parse_data(df)
-        
-        # Plot standard metrics
-        self._plot_metric(parsed_df, 'r', 'b')
-        self._plot_metric(parsed_df, 'l', 'g')
-        
-        # Plot pursuer-specific metrics
-        metrics = ['arousal', 'satiety', 'social-touch']
-        colors = {'arousal': 'r', 'satiety': 'purple', 'social-touch': 'orange'}
-        
-        for column in parsed_df.columns:
-            if any(metric in column for metric in metrics):
-                self._plot_metric(parsed_df, column, colors[column.split('_')[0]])
-        
-        # Create a combined plot
-        plt.figure(figsize=(15, 10))
-        plt.plot(parsed_df['t'], parsed_df['r'], label='Reward', color='b')
-        plt.plot(parsed_df['t'], parsed_df['l'], label='Episode Length', color='g')
-        
-        for column in parsed_df.columns:
-            if any(metric in column for metric in metrics):
-                plt.plot(parsed_df['t'], parsed_df[column], label=column, alpha=0.7)
-        
-        plt.title('All Metrics over time')
-        plt.xlabel('Timesteps')
-        plt.ylabel('Value')
-        plt.legend()
-        plt.savefig(f'{self.log_dir}/combined_metrics_plot.png')
-        plt.close()
-        
-        # Save parsed data to CSV
-        parsed_df.to_csv(f'{self.log_dir}/parsed_metrics.csv', index=False)
-        
-        print(f"Plots and parsed data saved in {self.log_dir}")
 
 def plot_results(log_folder, title="Learning Curve"):
     episode_rewards = np.load(os.path.join(log_folder, "episode_rewards.npy"))
@@ -227,8 +188,8 @@ def train_butterfly_supersuit(
         return func
 
 
-    total_timesteps = 10000000  # 5 million timesteps
-    eval_freq = 1000000  # Evaluate every 100,000 steps
+    total_timesteps = 10000  # 5 million timesteps
+    eval_freq = 10000  # Evaluate every 100,000 steps
 
     # Create metadata file
     metadata = {
