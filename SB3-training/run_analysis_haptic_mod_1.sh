@@ -2,21 +2,17 @@
 
 # Example batch script to run a Python script in a virtual environment.
 
-# Request 1 minutes of wallclock time (format hours:minutes:seconds).
-#$ -l h_rt=0:1:0
+#$ -l tmpfs=10G
 
-# Request 1 gigabyte of RAM for each core/thread 
-# (must be an integer followed by M, G, or T)
-#$ -l mem=1G
+# Example batch script to run a Python script in a virtual environment.
+#request 24 hours 
+#$ -l h_rt=18:00:00
 
-# Request 1 gigabyte of TMPDIR space (default is 10 GB)
-#$ -l tmpfs=1G
+# For 2 GPUs
+#$ -l gpu=2
 
 # Set the name of the job.
-#$ -N python-analysis-example
-
-# Request 1 cores.
-#$ -pe smp 1
+#$ -N pettingzoo
 
 # Set the working directory to project directory in your scratch space.
 # Replace "<your_UCL_id>" with your UCL user ID
