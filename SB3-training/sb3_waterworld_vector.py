@@ -130,6 +130,16 @@ def plot_episode_rewards(ax, rewards, episode_num):
     ax.set_ylabel("Average Reward")
     ax.grid(True)
 
+class CustomCheckpointCallback(CheckpointCallback):
+    def _on_step(self):
+        if self.n_calls % self.save_freq == 0:
+            print(f"Attempting to save model checkpoint at step {self.n_calls}")
+            try:
+                super()._on_step()
+                print(f"Successfully saved model checkpoint at step {self.n_calls}")
+            except Exception as e:
+                print(f"Error saving checkpoint at step {self.n_calls}: {str(e)}")
+        return True
 
 def train_butterfly_supersuit(
     env_fn, policy_name, steps: int = 10_000, seed: int | None = 0, **env_kwargs,
@@ -189,7 +199,7 @@ def train_butterfly_supersuit(
 
 
     total_timesteps = 10000000  # 5 million timesteps
-    eval_freq = 500000  # Evaluate every 100,000 steps
+    eval_freq = 10000  # Evaluate every 100,000 steps
 
     # Create metadata file
     metadata = {
@@ -219,34 +229,44 @@ def train_butterfly_supersuit(
         render=False,
         verbose=1
     )
+
+
+    checkpoint_callback = CustomCheckpointCallback(save_freq=10000, save_path=log_dir,
+                                                name_prefix='rl_model')
     
-    # Create the early stopping callback
-    stop_train_callback = StopTrainingOnNoModelImprovement(
-        max_no_improvement_evals=5,
-        min_evals=20,
-        verbose=1
-    )
+
 
     # Combine EvalCallback and StopTrainingOnNoModelImprovement
     callback_on_best = StopTrainingOnNoModelImprovement(max_no_improvement_evals=5, min_evals=20, verbose=1)
     eval_callback = EvalCallback(eval_env, callback_on_new_best=callback_on_best, eval_freq=eval_freq,
                                 best_model_save_path=log_dir, deterministic=True, render=False)
 
-    checkpoint_callback = CheckpointCallback(save_freq=500000, save_path=log_dir,
-                                         name_prefix='rl_model')
+    #checkpoint_callback = CheckpointCallback(save_freq=100000, save_path=log_dir,
+    #                                     name_prefix='rl_model')
     
     # Your plotting callback
     plotting_callback = PlottingCallbackMetrics(log_dir)
 
 
     # Combine all callbacks
-    callbacks = [eval_callback, plotting_callback, checkpoint_callback]
+    callbacks = [eval_callback, callback_on_best, checkpoint_callback]
 
 
     # Create and train the model with the learning rate schedule
     #model = RecurrentPPO("MlpLstmPolicy", env, verbose=1, learning_rate=learning_rate)
     model = RecurrentPPO(policy_name, env, verbose=1, learning_rate=learning_rate)
-    model.learn(total_timesteps=total_timesteps, callback=callbacks)
+    try: 
+        model.learn(total_timesteps=total_timesteps, callback=callbacks)
+        except Exception as e:
+        print(f"An error occurred during training: {str(e)}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        # Always try to save the model, even if an error occurred
+        if model:
+            model_save_path = os.path.join(log_dir, f"final_model_{time.strftime('%Y%m%d-%H%M%S')}.zip")
+            model.save(model_save_path)
+            print(f"Model saved to {model_save_path}")
     model_save_path = os.path.join(log_dir, f"{env.unwrapped.metadata.get('name')}_{timestamp}.zip")
     model.save(model_save_path)
 
