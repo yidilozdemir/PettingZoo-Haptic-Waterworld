@@ -198,7 +198,7 @@ def train_butterfly_supersuit(
         return func
 
 
-    total_timesteps = 10000000  # 5 million timesteps
+    total_timesteps = 5000000  # 5 million timesteps
     eval_freq = 10000  # Evaluate every 100,000 steps
 
     # Create metadata file
@@ -249,24 +249,27 @@ def train_butterfly_supersuit(
 
 
     # Combine all callbacks
-    callbacks = [eval_callback, callback_on_best, checkpoint_callback]
+    callbacks = [eval_callback, checkpoint_callback]
 
 
     # Create and train the model with the learning rate schedule
     #model = RecurrentPPO("MlpLstmPolicy", env, verbose=1, learning_rate=learning_rate)
     model = RecurrentPPO(policy_name, env, verbose=1, learning_rate=learning_rate)
+    '''
     try: 
         model.learn(total_timesteps=total_timesteps, callback=callbacks)
-        except Exception as e:
+    except Exception as e:
         print(f"An error occurred during training: {str(e)}")
         import traceback
         traceback.print_exc()
-    finally:
+    finally: 
         # Always try to save the model, even if an error occurred
         if model:
             model_save_path = os.path.join(log_dir, f"final_model_{time.strftime('%Y%m%d-%H%M%S')}.zip")
             model.save(model_save_path)
             print(f"Model saved to {model_save_path}")
+    '''
+    model.learn(total_timesteps=total_timesteps, callback=callbacks)
     model_save_path = os.path.join(log_dir, f"{env.unwrapped.metadata.get('name')}_{timestamp}.zip")
     model.save(model_save_path)
 
@@ -541,11 +544,15 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
 
+    
+
     policy_name = args.policy_name
     env_kwargs = {
         "n_pursuers": args.n_pursuers,
         "haptic_modulation_type": args.haptic_modulation_type,
-        "haptic_weight" : args.haptic_weight
+        "haptic_weight" : args.haptic_weight,
+        "satiety_reward_factor": 10,
+        "arousal_penalty_factor" : 10
     }
 
     # Train a model (takes ~3 minutes on GPU)
