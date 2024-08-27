@@ -198,7 +198,7 @@ def train_butterfly_supersuit(
         return func
 
 
-    total_timesteps = 5000000  # 5 million timesteps
+    total_timesteps = 10000000  # 5 million timesteps
     eval_freq = 10000  # Evaluate every 100,000 steps
 
     # Create metadata file
