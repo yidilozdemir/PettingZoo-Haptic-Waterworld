@@ -6,10 +6,9 @@
 
 # Example batch script to run a Python script in a virtual environment.
 #request 24 hours 
-#$ -l h_rt=18:00:00
+#$ -l h_rt=20:00:00
 
-# For 2 GPUs
-#$ -l gpu=2
+#$ -pe smp 6
 
 # Set the name of the job.
 #$ -N pettingzoo
