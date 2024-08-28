@@ -6,7 +6,7 @@
 
 # Example batch script to run a Python script in a virtual environment.
 #request 15 hours 
-#$ -l h_rt=15:00:00
+#$ -l h_rt=20:00:00
 
 #$ -pe smp 6
 
