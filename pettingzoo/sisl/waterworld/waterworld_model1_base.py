@@ -178,21 +178,39 @@ class WaterworldBase:
 
         for i in range(self.n_pursuers):
             x, y = self._generate_coord(self.base_radius)
-            self.pursuers.append(
-                Pursuers(
-                    x,
-                    y,
-                    self.pursuer_max_accel,
-                    self.pursuer_speed,
-                    radius=self.base_radius,
-                    collision_type=i + 1,
-                    n_sensors=self.n_sensors,
-                    sensor_range=self.sensor_range,
-                    speed_features=self.speed_features,
-                    haptic_modulation_type=self.haptic_modulation_type,
-                    satiety_arousal_rate=self.satiety_arousal_rate,
-                    haptic_weight=self.haptic_weight
+            if i == 0:
+                self.pursuers.append(
+                    Pursuers(
+                        x,
+                        y,
+                        self.pursuer_max_accel,
+                        self.pursuer_speed,
+                        radius=self.base_radius,
+                        collision_type=i + 1,
+                        n_sensors=self.n_sensors,
+                        sensor_range=self.sensor_range,
+                        speed_features=self.speed_features,
+                        haptic_modulation_type=self.haptic_modulation_type,
+                        satiety_arousal_rate=self.satiety_arousal_rate,
+                        haptic_weight=self.haptic_weight
+                    )
                 )
+            elif i == 1:
+                self.pursuers.append(
+                        Pursuers(
+                            x,
+                            y,
+                            self.pursuer_max_accel,
+                            self.pursuer_speed,
+                            radius=self.base_radius,
+                            collision_type=i + 1,
+                            n_sensors=self.n_sensors,
+                            sensor_range=self.sensor_range,
+                            speed_features=self.speed_features,
+                            haptic_modulation_type=self.haptic_modulation_type,
+                            satiety_arousal_rate=self.satiety_arousal_rate,
+                            haptic_weight=self.haptic_weight
+                        )       
             )
 
         for i in range(self.n_evaders):
@@ -538,6 +556,7 @@ class WaterworldBase:
             self.behavior_rewards = [0 for _ in range(self.n_pursuers)]
 
             nutrition_per_pursuer = 0 
+            evader_eaten_value = 0 
             for evader in self.evaders:
                 pursuers_eating = [
                     pursuer for pursuer in self.pursuers
@@ -553,6 +572,7 @@ class WaterworldBase:
                         pursuer_index = self.pursuers.index(pursuer)
                         self.behavior_rewards[pursuer_index] += int(self.food_reward)
                     evader.eaten = True
+                    evader_eaten_value += 1
                 else:
                     # Food is encountered but not consumed
                     for pursuer in self.pursuers:
@@ -582,7 +602,7 @@ class WaterworldBase:
                     "social-touch-modulation" : f"pursuer_{i}_{pursuer.social_haptic_modulation}",
                     "evader-eaten" : f"pursuer_{i}_{evader.eaten}",
                     "food_indicator": f"pursuer_{i}_{pursuer.shape.food_indicator}",
-                    "nutrition-per-pursuer": f"pursuer_{i}_{nutrition_per_pursuer}",
+                    "nutrition-per-pursuer": f"pursuer_{i}_{evader_eaten_value}",
                     "poison_indicator": f"pursuer_{i}_{pursuer.shape.poison_indicator}"
                 }
             

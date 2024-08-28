@@ -102,7 +102,7 @@ class Pursuers(MovingObject):
         sensor_range=0.2,
         collision_type=1,
         speed_features=True,
-        max_satiety = 1.5,
+        max_satiety = 5,
         initial_satiety=0.5,
         initial_arousal=0.5,
         satiety_decay_rate=0.01,
