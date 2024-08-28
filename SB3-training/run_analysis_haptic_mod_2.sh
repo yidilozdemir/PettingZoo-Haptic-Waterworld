@@ -11,7 +11,7 @@
 #$ -pe smp 14
 
 # Set the name of the job.
-#$ -N 0.3pettingzoo
+#$ -N 03pettingzoo
 
 # Set the working directory to project directory in your scratch space.
 # Replace "<your_UCL_id>" with your UCL user ID
