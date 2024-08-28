@@ -281,11 +281,13 @@ def train_butterfly_supersuit(
     print(mean_reward)
     print(std_reward)
 
-    
-    with open(metadata_path, "w") as f:
-        f.write(f"mean_reward: {mean_reward}\n")
-        f.write(f"std_reward: {std_reward}\n")
-
+    try: 
+        with open(metadata_path, "a") as f:
+            f.write("n_eval_episodes: 20")
+            f.write(f"mean_reward: {mean_reward}\n")
+            f.write(f"std_reward: {std_reward}\n")
+    except:
+        print("cannot write eval data")
     env.close()
     eval_env.close()
 
@@ -355,7 +357,7 @@ def eval(env_fn, num_games: int = 100, render_mode: str | None = None, **env_kwa
                 print(rewards)
                 rewards[a] += env.rewards[a]
                 print("reward for agent " + str(a) + " = " + str(rewards[a]))
-        env.render("human")        
+
     # Print results
     print("\nResults:")
     for agent in env.possible_agents:
@@ -551,10 +553,10 @@ if __name__ == "__main__":
         "n_pursuers": args.n_pursuers,
         "haptic_modulation_type": args.haptic_modulation_type,
         "haptic_weight" : args.haptic_weight,
-        "satiety_reward_factor": 10,
-        "arousal_penalty_factor" : 10
     }
 
+    # "satiety_reward_factor": 10,
+    # "arousal_penalty_factor" : 10
     # Train a model (takes ~3 minutes on GPU)
     #train_butterfly_supersuit(env_fn, steps=196_608, seed=0, **env_kwargs)
 
@@ -562,7 +564,7 @@ if __name__ == "__main__":
     log_dir = train_butterfly_supersuit(env_fn, policy_name, steps=196_608, seed=0,  **env_kwargs)
 
     # Watch 2 games    #
-    #eval(env_fn, num_games=10, render_mode=None, **env_kwargs)
+    #eval(env_fn, num_games=20, render_mode=None, **env_kwargs)
     #call_eval()
     #plot_results_custom(log_dir)
     
