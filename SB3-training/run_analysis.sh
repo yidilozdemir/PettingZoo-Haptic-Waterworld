@@ -5,10 +5,10 @@
 #$ -l tmpfs=10G
 
 # Example batch script to run a Python script in a virtual environment.
-#request 24 hours 
-#$ -l h_rt=20:00:00
+#request 12 hours 
+#$ -l h_rt=12:00:00
 
-#$ -pe smp 6
+#$ -pe smp 14
 
 # Set the name of the job.
 #$ -N pettingzoo

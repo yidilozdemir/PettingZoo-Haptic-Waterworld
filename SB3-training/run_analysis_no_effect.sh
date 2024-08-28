@@ -6,13 +6,13 @@
 #$ -l tmpfs=10G
 
 # Example batch script to run a Python script in a virtual environment.
-#request 24 hours 
-#$ -l h_rt=20:00:00
+#request 12 hours 
+#$ -l h_rt=12:00:00
 
-#$ -pe smp 6
+#$ -pe smp 14
 
 # Set the name of the job.
-#$ -N pettingzoo-noeffect
+#$ -N noeffpettingzoo
 
 # Set the working directory to project directory in your scratch space.
 # Replace "<your_UCL_id>" with your UCL user ID
