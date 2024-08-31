@@ -7,9 +7,9 @@
 
 # Example batch script to run a Python script in a virtual environment.
 #request 22 hours 
-#$ -l h_rt=22:00:00
+#$ -l h_rt=32:00:00
 
-#$ -pe smp 8
+#$ -pe smp 12
 
 # Set the name of the job.
 #$ -N p08ettingzoo
