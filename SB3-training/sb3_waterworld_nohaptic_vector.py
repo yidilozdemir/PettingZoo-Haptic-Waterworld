@@ -527,7 +527,7 @@ def call_eval(n_evaluations = 5):
 
 if __name__ == "__main__":
     env_fn = waterworld_v4
-    #env_kwargs = {"n_pursuers" : 2, "haptic_modulation_type" : "no_effect" }
+    env_kwargs = {"n_pursuers" : 2 }
 
     parser = argparse.ArgumentParser(description="Train a butterfly supersuit model")
     parser.add_argument('--policy_name', type=str, default='MlpPolicy', help='PolicyName')
