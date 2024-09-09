@@ -467,7 +467,8 @@ class WaterworldBase:
                 "evader-eaten" : f"pursuer_{i}_initial",
                 "food_indicator": f"pursuer_{i}_initial",
                 "nutrition-per-pursuer": f"pursuer_{i}_initial",
-                "poison_indicator": f"pursuer_{i}_initial"
+                "poison_indicator": f"pursuer_{i}_initial",
+                "sensor_range": f"pursuer_{i}_{pursuer.sensor_range}"
             }
 
         return obs_list[0]
@@ -603,7 +604,8 @@ class WaterworldBase:
                     "evader-eaten" : f"pursuer_{i}_{evader.eaten}",
                     "food_indicator": f"pursuer_{i}_{pursuer.shape.food_indicator}",
                     "nutrition-per-pursuer": f"pursuer_{i}_{evader_eaten_value}",
-                    "poison_indicator": f"pursuer_{i}_{pursuer.shape.poison_indicator}"
+                    "poison_indicator": f"pursuer_{i}_{pursuer.shape.poison_indicator}",
+                    "sensor_range" : f"pursuer_{i}_{pursuer.sensor_range}"
                 }
             
             # Remove eaten evaders and spawn new ones
@@ -906,4 +908,11 @@ class WaterworldBase:
             else None
         )
     
-    
+  obs = env.reset()
+
+    # Cell and hidden state of the LSTM
+lstm_states = None
+num_envs = 1
+    # Episode start signals are used to reset the lstm states
+episode_starts = np.ones((num_envs,), dtype=bool)
+num_games = 20 
