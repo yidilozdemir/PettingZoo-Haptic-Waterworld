@@ -165,7 +165,7 @@ def train_butterfly_supersuit(
     env = create_env(num_envs=8)
 
     # Metrics to track we are interested in 
-    info_keywords = ['arousal', 'satiety', 'social-touch','social-touch-modulation', 'evader-eaten' ,'food_indicator', 'nutrition-per-pursuer', 'poison_indicator']
+    info_keywords = ['arousal', 'satiety', 'social-touch','social-touch-modulation', 'evader-eaten' ,'food_indicator', 'nutrition-per-pursuer', 'poison_indicator', 'sensor_range']
     #info_keywords = [f"pursuer_{i}_{metric}" for i in range(n_pursuers) for metric in base_metrics]
 
     # Wrap the vectorized environment with VecMonitor
@@ -324,7 +324,7 @@ def eval(env_fn, num_games: int = 100, render_mode: str | None = None, **env_kwa
     
 
     # Metrics to track we are interested in 
-    info_keywords = ['arousal', 'satiety', 'social-touch','social-touch-modulation', 'evader-eaten' ,'food_indicator', 'nutrition-per-pursuer', 'poison_indicator']
+    info_keywords = ['arousal', 'satiety', 'social-touch','social-touch-modulation', 'evader-eaten' ,'food_indicator', 'nutrition-per-pursuer', 'poison_indicator', 'sensor_range']
     #info_keywords = [f"pursuer_{i}_{metric}" for i in range(n_pursuers) for metric in base_metrics]
 
     # Wrap the vectorized environment with VecMonitor
