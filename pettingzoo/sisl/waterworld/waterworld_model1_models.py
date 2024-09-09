@@ -109,7 +109,8 @@ class Pursuers(MovingObject):
         arousal_decay_rate=0.005,
         haptic_modulation_type="average",
         satiety_arousal_rate=0,
-        haptic_weight=0.5
+        haptic_weight=0.5,
+        max_sensor_range=1
     ):  
         super().__init__(x, y, radius=radius)
 
@@ -211,7 +212,8 @@ class Pursuers(MovingObject):
         self.arousal = np.clip(self.arousal, -1, 1)
 
         # Update sensor range
-        self.sensor_range = self.sensor_range * (1 + self.arousal)
+        new_sensor_range += self.sensor_range * (self.initial_arousal + self.arousal)
+        self.sensor_range = min(new_sensor_range, self.max_sensor_range)
 
     def distance_to(self, other):
         return np.linalg.norm(np.array(self.body.position) - np.array(other.body.position))
