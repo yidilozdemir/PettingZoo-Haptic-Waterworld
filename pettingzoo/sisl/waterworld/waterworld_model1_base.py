@@ -908,4 +908,3 @@ class WaterworldBase:
             else None
         )
     
-  obs = env.reset()
