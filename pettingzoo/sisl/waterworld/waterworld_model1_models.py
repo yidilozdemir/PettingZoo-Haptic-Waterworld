@@ -212,8 +212,8 @@ class Pursuers(MovingObject):
         self.arousal = np.clip(self.arousal, -1, 1)
 
         # Update sensor range
-        new_sensor_range = self.sensor_range * (self.initial_arousal + self.arousal)
-        self.sensor_range = min(new_sensor_range, self.max_sensor_range)
+        self.sensor_range = self.sensor_range * (self.initial_arousal + self.arousal)
+        self.sensor_range = min(self.sensor_range, self.max_sensor_range)
 
     def distance_to(self, other):
         return np.linalg.norm(np.array(self.body.position) - np.array(other.body.position))
