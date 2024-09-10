@@ -125,6 +125,7 @@ class Pursuers(MovingObject):
 
         self.satiety = initial_satiety
         self.arousal = initial_arousal
+        self.initial_arousal = initial_arousal
         self.max_satiety = max_satiety
         self.satiety_decay_rate = satiety_decay_rate
         self.arousal_decay_rate = arousal_decay_rate
