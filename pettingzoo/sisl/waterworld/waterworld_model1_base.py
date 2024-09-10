@@ -909,10 +909,3 @@ class WaterworldBase:
         )
     
   obs = env.reset()
-
-    # Cell and hidden state of the LSTM
-lstm_states = None
-num_envs = 1
-    # Episode start signals are used to reset the lstm states
-episode_starts = np.ones((num_envs,), dtype=bool)
-num_games = 20 
