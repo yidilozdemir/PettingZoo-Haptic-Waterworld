@@ -867,6 +867,8 @@ class WaterworldBase:
 
         # Indicate that food is touched by pursuer
         pursuer_shape.social_touch_indicator += 1
+        other_pursuer_shape.social_touch_indicator += 1
+        
 
         return False
     
