@@ -349,11 +349,73 @@ class WaterworldBase:
             self.barriers[-1].elasticity = 0.999
             self.space.add(self.barriers[-1])
 
+
     def draw(self):
-        """Draw all moving objects and obstacles in PyGame."""
+        # Get the current display surface
+        surface = pygame.display.get_surface()
+        
+        # Fill background
+        surface.fill((255, 255, 255))
+        
+        # Draw all game objects
         for obj_list in [self.pursuers, self.evaders, self.poisons, self.obstacles]:
             for obj in obj_list:
-                obj.draw(self.screen, self.convert_coordinates)
+                obj.draw(surface, self.convert_coordinates)
+        
+        # Add text overlay for agent states
+        font = pygame.font.Font(None, 24)
+        
+        for i, pursuer in enumerate(self.pursuers):
+            # Get pursuer position and convert it for display
+            pos = self.convert_coordinates(pursuer.body.position)
+            
+            # Draw state values
+            text_y = pos[1] - 40  # Start above the agent
+            
+            # Draw arousal and satiety
+            arousal_text = f"A: {pursuer.arousal:.2f}"
+            satiety_text = f"S: {pursuer.satiety:.2f}"
+            
+            text = font.render(arousal_text, True, (0, 0, 0))
+            surface.blit(text, (pos[0] - 30, text_y))
+            
+            text = font.render(satiety_text, True, (0, 0, 0))
+            surface.blit(text, (pos[0] - 30, text_y + 20))
+            
+            # Highlight touch events
+            if pursuer.shape.social_touch_indicator > 0:
+                # Draw yellow circle around touching agents
+                pygame.draw.circle(
+                    surface,
+                    (255, 255, 0),  # Yellow
+                    pos,
+                    pursuer.radius + 5,  # Slightly larger than agent
+                    2  # Line width
+                )
+                
+                # Show touch indicator
+                touch_text = "Touch!"
+                text = font.render(touch_text, True, (255, 165, 0))  # Orange
+                surface.blit(text, (pos[0] - 25, pos[1] - 60))
+            
+            # Draw sensor visualization
+            sensor_color = (100, 100, 100)  # Gray
+            for sensor in pursuer._sensors:
+                start = pos
+                end = (
+                    pos[0] + pursuer.sensor_range * sensor[0],
+                    pos[1] + pursuer.sensor_range * sensor[1]
+                )
+                pygame.draw.line(surface, sensor_color, start, end, 1)
+                
+                # Draw sensor range circle
+                pygame.draw.circle(
+                    surface,
+                    sensor_color,
+                    pos,
+                    int(pursuer.sensor_range),
+                    1  # Line width
+                )
 
     def add_handlers(self):
         # Collision handlers for pursuers v.s. evaders & poisons
