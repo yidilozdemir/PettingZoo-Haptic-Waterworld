@@ -2,11 +2,11 @@
 
 # Example batch script to run a Python script in a virtual environment.
 
-#$ -l tmpfs=15G
+#$ -l tmpfs=25G
 
 # Example batch script to run a Python script in a virtual environment.
 #request 22 hours 
-#$ -l h_rt=32:00:00
+#$ -l h_rt=48:00:00
 
 #$ -pe smp 20
 
