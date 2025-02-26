@@ -303,94 +303,42 @@ def plot_with_confidence_interval(ax, data, label, color):
     ax.fill_between(x, mean - ci, mean + ci, color=color, alpha=0.3)
 
 
-def eval(env_fn, num_games: int = 100, render_mode: str | None = None, **env_kwargs):
-    # Evaluate a trained agent vs a random agent
+def eval(env_fn, num_games: int = 100, render_mode: str | None = None,  **env_kwargs):
     env = env_fn.env(render_mode=render_mode, **env_kwargs)
-    
-    print(
-        f"\nStarting evaluation on {env.unwrapped.metadata.get('name')} {os.path.getctime}  (num_games={num_games}, render_mode={render_mode})"
-    )
-    env_name = "pettingzoo.sisl." + env.metadata['name'] # Adjust this to match your folder naming convention
-
-    try:
-        # Look for the best model in the logs directory
-        latest_policy = find_latest_policy(env_name)
-
-        print(f"Loading policy from: {latest_policy}")
-    except ValueError:
-        print("Policy not found.")
-        exit(0)
-
-    
-
-    # Metrics to track we are interested in 
-    info_keywords = ['arousal', 'satiety', 'social-touch','social-touch-modulation', 'evader-eaten' ,'food_indicator', 'nutrition-per-pursuer', 'poison_indicator', 'sensor_range']
-    #info_keywords = [f"pursuer_{i}_{metric}" for i in range(n_pursuers) for metric in base_metrics]
-
-    # Wrap the vectorized environment with VecMonitor
-
+    latest_policy = "best_model.zip"
     model = RecurrentPPO.load(latest_policy)
-
-    print(f"Starting eval on {str(env.metadata['name'])}.")
-
-    # Wrap the environment in a DummyVecEnv
-    #vec_env = DummyVecEnv([lambda: env])
-
-    rewards = {agent: 0 for agent in env.possible_agents}
-    #metrics = {agent: {'arousal': [], 'satiety': [], 'social_touch': []} for agent in env.possible_agents}
-    obs = env.reset()
-
-    # Cell and hidden state of the LSTM
+    
+    obs = env.reset()  # Remove unpacking
     lstm_states = None
-    num_envs = 1
-    # Episode start signals are used to reset the lstm states
-    episode_starts = np.ones((num_envs,), dtype=bool)
+    episode_starts = np.ones((1,), dtype=bool)
+    rewards = {agent: 0 for agent in env.possible_agents}
 
     while True:
-        action, lstm_states = model.predict(obs, state=lstm_states, episode_start=episode_starts, deterministic=True)
-        # Note: vectorized environment resets automatically
-        obs, rewards, dones, info = env.step(action)
-        episode_starts = dones
-        for a in env.agents:
-                print(a)
-                print(env.rewards[a])
-                print(rewards)
-                rewards[a] += env.rewards[a]
-                print("reward for agent " + str(a) + " = " + str(rewards[a]))
+        for agent in env.agent_iter():
+            observation, reward, termination, truncation, info = env.last()
+            
+            if termination or truncation:
+                action = None
+            else:
+                obs_array = np.array(observation, dtype=np.float32).reshape(-1)
+                action, lstm_states = model.predict(
+                    obs_array,
+                    state=lstm_states,
+                    episode_start=episode_starts,
+                    deterministic=True
+                )
+                env.step(action)
 
-    # Print results
-    print("\nResults:")
-    for agent in env.possible_agents:
-        print(f"Agent {agent}:")
-        print(f" Total Reward: {rewards[agent]}")
-        #for metric in ['arousal', 'satiety', 'social_touch']:
-        #    if metrics[agent][metric]:
-        #        mean_value = np.mean(metrics[agent][metric])
-        #        print(f" Mean {metric}: {mean_value:.4f}")
+            rewards[agent] += reward
+            if termination or truncation:
+                break
+        
+        if termination or truncation:
+            break
+            
+    env.close()
+    print("Final rewards:", rewards)
 
-def find_latest_policy(env_name, base_dir="."):
-    log_dir = os.path.join(base_dir, "logs")
-    
-    # Find all directories matching the pattern
-    pattern = os.path.join(log_dir, f"{env_name}*")
-    matching_dirs = glob.glob(pattern)
-    
-    if not matching_dirs:
-        print(f"No matching directories found in {log_dir}")
-        return None
-    
-    # Find the most recent directory
-    latest_dir = max(matching_dirs, key=os.path.getctime)
-    
-    # Look for best_model.zip in the latest directory
-    best_model_path = os.path.join(latest_dir, "best_model.zip")
-    
-    if os.path.exists(best_model_path):
-        return best_model_path
-    else:
-        print(f"best_model.zip not found in {latest_dir}")
-        return None
-    
 def eval_new(seed_start, env_fn, num_games: int = 100, render_mode: str | None = None, deterministic: bool = True, save_path: str = "./eval_results", **env_kwargs):
     env = env_fn.env(render_mode=render_mode, **env_kwargs)
                                         
@@ -561,10 +509,10 @@ if __name__ == "__main__":
     #train_butterfly_supersuit(env_fn, steps=196_608, seed=0, **env_kwargs)
 
     # Evaluate 10 games (average reward should be positive but can vary significantly)
-    log_dir = train_butterfly_supersuit(env_fn, policy_name, steps=196_608, seed=0,  **env_kwargs)
+    #log_dir = train_butterfly_supersuit(env_fn, policy_name, steps=196_608, seed=0,  **env_kwargs)
 
     # Watch 2 games    #
-    #eval(env_fn, num_games=20, render_mode=None, **env_kwargs)
+    eval(env_fn, num_games=1, render_mode='human', **env_kwargs)
     #call_eval()
     #plot_results_custom(log_dir)
     

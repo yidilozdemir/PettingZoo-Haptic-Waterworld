@@ -357,6 +357,29 @@ class WaterworldBase:
         # Fill background
         surface.fill((255, 255, 255))
         
+        # Draw sensors first (behind other objects)
+        for pursuer in self.pursuers:
+            pos = self.convert_coordinates(pursuer.body.position)
+            
+            # Draw sensor visualization with more visible color and thicker lines
+            sensor_color = (50, 50, 50)  # Darker gray
+            for sensor in pursuer._sensors:
+                start = pos
+                end = (
+                    int(pos[0] + pursuer.sensor_range * sensor[0]),
+                    int(pos[1] + pursuer.sensor_range * sensor[1])
+                )
+                pygame.draw.line(surface, sensor_color, start, end, 2)  # Increased line thickness
+                
+                # Draw sensor range circle
+                pygame.draw.circle(
+                    surface,
+                    sensor_color,
+                    pos,
+                    int(pursuer.sensor_range),
+                    1
+                )
+        
         # Draw all game objects
         for obj_list in [self.pursuers, self.evaders, self.poisons, self.obstacles]:
             for obj in obj_list:
@@ -366,11 +389,10 @@ class WaterworldBase:
         font = pygame.font.Font(None, 24)
         
         for i, pursuer in enumerate(self.pursuers):
-            # Get pursuer position and convert it for display
             pos = self.convert_coordinates(pursuer.body.position)
             
             # Draw state values
-            text_y = pos[1] - 40  # Start above the agent
+            text_y = pos[1] - 40
             
             # Draw arousal and satiety
             arousal_text = f"A: {pursuer.arousal:.2f}"
@@ -384,39 +406,18 @@ class WaterworldBase:
             
             # Highlight touch events
             if pursuer.shape.social_touch_indicator > 0:
-                # Draw yellow circle around touching agents
                 pygame.draw.circle(
                     surface,
-                    (255, 255, 0),  # Yellow
+                    (255, 255, 0),
                     pos,
-                    pursuer.radius + 5,  # Slightly larger than agent
-                    2  # Line width
+                    pursuer.radius + 5,
+                    2
                 )
                 
-                # Show touch indicator
                 touch_text = "Touch!"
-                text = font.render(touch_text, True, (255, 165, 0))  # Orange
+                text = font.render(touch_text, True, (255, 165, 0))
                 surface.blit(text, (pos[0] - 25, pos[1] - 60))
-            
-            # Draw sensor visualization
-            sensor_color = (100, 100, 100)  # Gray
-            for sensor in pursuer._sensors:
-                start = pos
-                end = (
-                    pos[0] + pursuer.sensor_range * sensor[0],
-                    pos[1] + pursuer.sensor_range * sensor[1]
-                )
-                pygame.draw.line(surface, sensor_color, start, end, 1)
                 
-                # Draw sensor range circle
-                pygame.draw.circle(
-                    surface,
-                    sensor_color,
-                    pos,
-                    int(pursuer.sensor_range),
-                    1  # Line width
-                )
-
     def add_handlers(self):
         # Collision handlers for pursuers v.s. evaders & poisons
         for pursuer in self.pursuers:
@@ -873,11 +874,7 @@ class WaterworldBase:
         return False
 
     def pursuer_evader_begin_callback(self, arbiter, space, data):
-        """Called when a collision between a pursuer and an evader occurs.
-
-        The counter of the evader increases by 1, if the counter reaches
-        n_coop, then, the pursuer catches the evader and gets a reward.
-        """
+        """Called when a collision between a pursuer and an evader occurs."""
         pursuer_shape, evader_shape = arbiter.shapes
 
         # Add one collision to evader
@@ -886,9 +883,12 @@ class WaterworldBase:
         # Indicate that food is touched by pursuer
         pursuer_shape.food_touched_indicator += 1
 
+        # If we've reached n_coop pursuers, mark all touching pursuers
         if evader_shape.counter >= self.n_coop:
-            # For giving reward to pursuer
-            pursuer_shape.food_indicator = 1
+            # Set food indicator for all pursuers currently touching this evader
+            for pursuer in self.pursuers:
+                if pursuer.shape.food_touched_indicator > 0:
+                    pursuer.shape.food_indicator = 1
 
         return False
 
